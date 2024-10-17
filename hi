@@ -1,503 +1,631 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<pthread.h>
+5.wireless.tcl
+set val(chan) Channel/WirelessChannel ;#Channel Type
+set val(prop) Propagation/TwoRayGround ;# radio-propagation model
+set val(netif) Phy/WirelessPhy ;# network interface type WAVELAN DSSS 2.4GHz
+set val(mac) Mac/802_11 ;# MAC type
+set val(ifq) Queue/DropTail/PriQueue ;# interface queue type
+set val(ll) LL ;# link layer type
+set val(ant) Antenna/OmniAntenna ;# antenna model
+set val(ifqlen) 50 ;# max packet in ifq
+set val(nn) 6 ;# number of mobilenodes
+set val(rp) AODV ;# routing protocol
+set val(x) 500 ;# in metresset
+set val(y) 500 ;# in metres
+#Adhoc OnDemand Distance Vector
+#Creation of Simulator
+set ns [new Simulator]
 
-void *calprime(void *inp)
+#Creation of Trace and namefile
+set tracefile [open wireless.tr w]
+$ns trace-all $tracefile
+
+#Creation of Network Animation file
+set namfile [open wireless.nam w]
+$ns namtrace-all-wireless $namfile $val(x) $val(y)
+
+#Create Topography
+set topo [new Topography]
+$topo load_flatgrid $val(x) $val(y)
+
+#GOD Creation - General Operations Director
+create-god $val(nn)
+
+set channel1 [new $val(chan)]
+set channel2 [new $val(chan)]
+set channel3 [new $val(chan)]
+
+#Configure the Node
+$ns node-config -adhocRouting $val(rp) \
+-llType $val(ll) \
+-macType $val(mac) \
+-ifqType $val(ifq) \
+-ifqLen $val(ifqlen) \
+-antType $val(ant) \
+-propType $val(prop) \
+-phyType $val(netif) \
+-topoInstance $topo \
+-agentTrace ON \
+-macTrace ON \
+-routerTrace ON \
+-movementTrace ON \
+-channel $channel1
+
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+
+$n0 random-motion 0
+$n1 random-motion 0
+$n2 random-motion 0
+$n3 random-motion 0
+$n4 random-motion 0
+$n5 random-motion 0
+
+$ns initial_node_pos $n0 20
+$ns initial_node_pos $n1 20
+$ns initial_node_pos $n2 20
+$ns initial_node_pos $n3 20
+$ns initial_node_pos $n4 20
+$ns initial_node_pos $n5 50
+
+#Initial coordinates of the nodes
+
+$n0 set X_ 10.0
+$n0 set Y_ 20.0
+$n0 set Z_ 0.0
+
+$n1 set X_ 210.0
+$n1 set Y_ 230.0
+$n1 set Z_ 0.0
+
+$n2 set X_ 100.0
+$n2 set Y_ 200.0
+$n2 set Z_ 0.0
+
+$n3 set X_ 150.0
+$n3 set Y_ 230.0
+$n3 set Z_ 0.0
+
+$n4 set X_ 430.0
+$n4 set Y_ 320.0
+$n4 set Z_ 0.0
+
+$n5 set X_ 270.0
+$n5 set Y_ 120.0
+$n5 set Z_ 0.0
+#Dont mention any values above than 500 because in this example, we use X and Y as 500,500
+
+#Mobility of the nodes
+#At what Time? Which node? Where to? at What Speed?
+$ns at 1.0 "$n1 setdest 490.0 340.0 25.0"
+$ns at 1.0 "$n4 setdest 300.0 130.0 5.0"
+$ns at 1.0 "$n5 setdest 190.0 440.0 15.0"
+
+#The nodes can move any number of times at any location during the simulation (runtime)
+$ns at 20.0 "$n5 setdest 100.0 200.0 30.0"
+
+#Creation of agents
+set tcp [new Agent/TCP]
+set sink [new Agent/TCPSink]
+$ns attach-agent $n0 $tcp
+$ns attach-agent $n5 $sink
+$ns connect $tcp $sink
+set ftp [new Application/FTP]
+$ftp attach-agent $tcp
+$ns at 1.0 "$ftp start"
+
+set udp [new Agent/UDP]
+set null [new Agent/Null]
+$ns attach-agent $n2 $udp
+$ns attach-agent $n3 $null
+$ns connect $udp $null
+set cbr [new Application/Traffic/CBR]
+$cbr attach-agent $udp
+$ns at 1.0 "$cbr start"
+
+$ns at 30.0 "finish"
+
+proc finish {} {
+global ns tracefile namfile
+$ns flush-trace
+close $tracefile
+close $namfile
+exit 0
+
+}
+
+puts "Starting Simulation"
+$ns run
+
+delay-calc-WNS.awk
+BEGIN {
+    seqno = -1;
+    droppedPackets = 0;
+    receivedPackets = 0;
+    count = 0;
+}
 {
-    int *input=(int*)inp;
-    int flag=0;
-    
-    for (int i=2;i<=*input/2;i++)
-    {
-        if(input%i == 0)
-        {
-            flag++;
-            break;
+    #packet delivery ratio
+    if($4 == "AGT" && $1 == "s" && seqno < $6) {
+        seqno = $6;
+    } else if(($4 == "AGT") && ($1 == "r")) {
+        receivedPackets++;
+    } else if ($1 == "D" && $7 == "tcp" && $8 > 512){
+        droppedPackets++;
+    }
+
+    #end-to-end delay
+    if($4 == "AGT" && $1 == "s") {
+        start_time[$6] = $2;
+    } else if(($7 == "tcp") && ($1 == "r")) {
+        end_time[$6] = $2;
+    } else if($1 == "D" && $7 == "tcp") {
+        end_time[$6] = -1;
+    }
+}
+END {
+    for(i=0; i<=seqno; i++) {
+        if(end_time[i] > 0) {
+            delay[i] = end_time[i] - start_time[i];
+        count++;
+        } else {
+            delay[i] = -1;
         }
     }
-    if(flag==0)
-    {
-        printf("%d is a prime number",*input);
-    }
-    else{printf("%d is not a primenumber",*input);}
 
-}
-void *armstrong(void *inp)
-{
-    int *input=(int *)inp;
-    int temp=*input;
-    int n=0;
-    float res=0.0;
-    for(temp=*input;temp!=0;n++)
-    {
-    temp/=10;
-      }
-    for(temp=*input;temp!=0;temp/=10)
-    {
-        int remainder=temp%10;
-        int tempres=1;
-        for(int j=0;j<n;j++)
-        {
-            tempres*=remainder;
+    for(i=0; i<count; i++) {
+        if(delay[i] > 0) {
+            n_to_n_delay = n_to_n_delay + delay[i];
         }
-        res+=tempres;
     }
-    if ((int)res ==*input)
-    {
-        printf("%d is an armstrong",*input);
-    }
-    else{printf("%d is not an armstrong",*input);}
+
+    n_to_n_delay = n_to_n_delay/count;
+    print "\n";
+    print "GeneratedPackets = " seqno+1;
+    print "ReceivedPackets = " receivedPackets;
+    print "Packet Delivery Ratio = "receivedPackets/(seqno+1)*100"%";
+    print "Total Dropped Packets = " droppedPackets;
+    print "Average End-to-End Delay = " n_to_n_delay * 1000 " ms";
+    print "\n";
+}
+***********************************************************************
+DISTANCE VECTOR
+DV.tcl
+set ns [new Simulator]
+$ns rtproto DV
+$ns color 1 green
+set node0 [$ns node]
+set node1 [$ns node]
+set node2 [$ns node]
+set node3 [$ns node]
+set node4 [$ns node]
+
+set node5 [$ns node]
+set node6 [$ns node]
+set tf [open out_dv.tr w]
+$ns trace-all $tf
+set nf [open out_dv.nam w]
+$ns namtrace-all $nf
+
+set ft [open "dvr_th" "w"]
+$node0 label "node 0"
+$node1 label "node 1"
+$node2 label "node 2"
+$node3 label "node 3"
+$node4 label "node 4"
+
+$node5 label "node 5"
+$node6 label "node 6"
+$ns duplex-link $node0 $node1 1.5Mb 10ms DropTail
+$ns duplex-link $node1 $node2 1.5Mb 10ms DropTail
+$ns duplex-link $node2 $node3 1.5Mb 10ms DropTail
+$ns duplex-link $node3 $node4 1.5Mb 10ms DropTail
+
+$ns duplex-link $node4 $node5 1.5Mb 10ms DropTail
+$ns duplex-link $node5 $node6 1.5Mb 10ms DropTail
+$ns duplex-link $node6 $node0 1.5Mb 10ms DropTail
+$ns duplex-link-op $node0 $node1 orient left-down
+$ns duplex-link-op $node1 $node2 orient left-down
+$ns duplex-link-op $node2 $node3 orient right-down
+$ns duplex-link-op $node3 $node4 orient right
+$ns duplex-link-op $node4 $node5 orient right-up
+$ns duplex-link-op $node5 $node6 orient left-up
+$ns duplex-link-op $node6 $node0 orient left-up
+
+set tcp2 [new Agent/TCP]
+$tcp2 set class_ 1
+$ns attach-agent $node0 $tcp2
+set sink2 [new Agent/TCPSink]
+$ns attach-agent $node3 $sink2
+$ns connect $tcp2 $sink2
+set traffic_ftp2 [new Application/FTP]
+
+$traffic_ftp2 attach-agent $tcp2
+proc record {} {
+global sink2 tf ft
+global ftp
+set ns [Simulator instance]
+set time 0.1
+set now [$ns now]
+set bw0 [$sink2 set bytes_]
+puts $ft "$now [expr $bw0/$time*8/1000000]"
+$sink2 set bytes_ 0
+$ns at [expr $now+$time] "record"
 }
 
-void factorial(void *inp)
+proc finish {} {
+global ns nf
+$ns flush-trace
+close $nf
+exec nam out_dv.nam &
+exec xgraph dvr_th &
+exit 0
+}
+
+$ns at 0.55 "record"
+#Schedule events for the CBR agents
+$ns at 0.5 "$node0 color \"Green\""
+$ns at 0.5 "$node3 color \"Green\""
+$ns at 0.5 "$ns trace-annotate \"Starting FTP node0 to node6\""
+$ns at 0.5 "$node0 label-color green"
+$ns at 0.5 "$node3 label-color green"
+$ns at 0.5 "$traffic_ftp2 start"
+$ns at 0.5 "$node1 label-color green"
+
+$ns at 0.5 "$node2 label-color green"
+$ns at 0.5 "$node4 label-color blue"
+$ns at 0.5 "$node5 label-color blue"
+$ns at 0.5 "$node6 label-color blue"
+$ns rtmodel-at 2.0 down $node2 $node3
+
+$ns at 2.0 "$node4 label-color green"
+$ns at 2.0 "$node5 label-color green"
+$ns at 2.0 "$node6 label-color green"
+$ns at 2.0 "$node1 label-color blue"
+$ns at 2.0 "$node2 label-color blue"
+
+$ns rtmodel-at 3.0 up $node2 $node3
+$ns at 3.0 "$traffic_ftp2 start"
+$ns at 4.9 "$traffic_ftp2 stop"
+$ns at 5.0 "finish"
+$ns run
+*************************************************************************
+LINKSTATE
+LS.tcl
+set ns [new Simulator]
+$ns rtproto LS
+$ns color 1 green
+set node0 [$ns node]
+set node1 [$ns node]
+set node2 [$ns node]
+set node3 [$ns node]
+set node4 [$ns node]
+set node5 [$ns node]
+set node6 [$ns node]
+set tf [open out_ls.tr w]
+$ns trace-all $tf
+set nf [open out_ls.nam w]
+$ns namtrace-all $nf
+set ft [open "lsr_th" "w"]
+$node0 label "node 0"
+$node1 label "node 1"
+$node2 label "node 2"
+$node3 label "node 3"
+$node4 label "node 4"
+$node5 label "node 5"
+$node6 label "node 6"
+$ns duplex-link $node0 $node1 1.5Mb 10ms DropTail
+$ns duplex-link $node1 $node2 1.5Mb 10ms DropTail
+$ns duplex-link $node2 $node3 1.5Mb 10ms DropTail
+$ns duplex-link $node3 $node4 1.5Mb 10ms DropTail
+$ns duplex-link $node4 $node5 1.5Mb 10ms DropTail
+$ns duplex-link $node5 $node6 1.5Mb 10ms DropTail
+$ns duplex-link $node6 $node0 1.5Mb 10ms DropTail
+
+$ns duplex-link-op $node0 $node1 orient left-down
+$ns duplex-link-op $node1 $node2 orient left-down
+$ns duplex-link-op $node2 $node3 orient right-down
+$ns duplex-link-op $node3 $node4 orient right
+$ns duplex-link-op $node4 $node5 orient right-up
+$ns duplex-link-op $node5 $node6 orient left-up
+$ns duplex-link-op $node6 $node0 orient left-up
+
+set tcp2 [new Agent/TCP]
+$tcp2 set class_ 1
+$ns attach-agent $node0 $tcp2
+set sink2 [new Agent/TCPSink]
+$ns attach-agent $node3 $sink2
+$ns connect $tcp2 $sink2
+
+set traffic_ftp2 [new Application/FTP]
+$traffic_ftp2 attach-agent $tcp2
+proc record {} {
+global sink2 tf ft
+global ftp
+
+set ns [Simulator instance]
+set time 0.1
+set now [$ns now]
+set bw0 [$sink2 set bytes_]
+puts $ft "$now [expr $bw0/$time*8/1000000]"
+$sink2 set bytes_ 0
+$ns at [expr $now+$time] "record"
+}
+
+proc finish {} {
+global ns nf
+$ns flush-trace
+close $nf
+
+exec nam out_ls.nam &
+exec xgraph lsr_th &
+exit 0
+}
+
+$ns at 0.55 "record"
+#Schedule events for the CBR agents
+$ns at 0.5 "$node0 color \"Green\""
+$ns at 0.5 "$node3 color \"Green\""
+$ns at 0.5 "$ns trace-annotate \"Starting FTP node0 to node3\""
+$ns at 0.5 "$node0 label-color green"
+$ns at 0.5 "$node3 label-color green"
+
+$ns at 0.5 "$traffic_ftp2 start"
+$ns at 0.5 "$node1 label-color green"
+$ns at 0.5 "$node2 label-color green"
+$ns at 0.5 "$node4 label-color blue"
+$ns at 0.5 "$node5 label-color blue"
+$ns at 0.5 "$node6 label-color blue"
+$ns rtmodel-at 2.0 down $node2 $node3
+$ns at 2.0 "$node4 label-color green"
+$ns at 2.0 "$node5 label-color green"
+$ns at 2.0 "$node6 label-color green"
+$ns at 2.0 "$node1 label-color blue"
+$ns at 2.0 "$node2 label-color blue"
+$ns rtmodel-at 3.0 up $node2 $node3
+$ns at 3.0 "$traffic_ftp2 start"
+$ns at 4.9 "$traffic_ftp2 stop"
+$ns at 5.0 "finish"
+$ns run
+***************************************************************************
+MULTICAST
+exp8.tcl
+set ns [new Simulator -multicast on]
+#Turn on Tracing
+set tf [open output.tr w]
+$ns trace-all $tf
+# Turn on nam Tracing
+set fd [open mcast.nam w]
+$ns namtrace-all $fd
+# Create nodes
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+set n6 [$ns node]
+set n7 [$ns node]
+# Create links with DropTail Queues
+$ns duplex-link $n0 $n2 1.5Mb 10ms DropTail
+$ns duplex-link $n1 $n2 1.5Mb 10ms DropTail
+$ns duplex-link $n2 $n3 1.5Mb 10ms DropTail
+$ns duplex-link $n3 $n4 1.5Mb 10ms DropTail
+$ns duplex-link $n3 $n7 1.5Mb 10ms DropTail
+$ns duplex-link $n4 $n5 1.5Mb 10ms DropTail
+$ns duplex-link $n4 $n6 1.5Mb 10ms DropTail
+set mproto DM
+set mrthandle [$ns mrtproto $mproto {}]
+# Set two groups with group addresses
+set group1 [Node allocaddr]
+set group2 [Node allocaddr]
+# UDP Transport agent for the traffic source forgroup1
+set udp0 [new Agent/UDP]
+$ns attach-agent $n0 $udp0
+$udp0 set dst_addr_ $group1
+$udp0 set dst_port_ 0
+set cbr1 [new Application/Traffic/CBR]
+$cbr1 attach-agent $udp0
+# Transport agent for the traffic source for group2
+set udp1 [new Agent/UDP]
+$ns attach-agent $n1 $udp1
+$udp1 set dst_addr_ $group2
+$udp1 set dst_port_ 0
+set cbr2 [new Application/Traffic/CBR]
+$cbr2 attach-agent $udp1
+# Create receiver to accept the packets
+set rcvr1 [new Agent/Null]
+$ns attach-agent $n5 $rcvr1
+$ns at 1.0 "$n5 join-group $rcvr1 $group1"
+set rcvr2 [new Agent/Null]
+$ns attach-agent $n6 $rcvr2
+$ns at 1.5 "$n6 join-group $rcvr2 $group1"
+set rcvr3 [new Agent/Null]
+$ns attach-agent $n7 $rcvr3
+$ns at 2.0 "$n7 join-group $rcvr3 $group1"
+set rcvr4 [new Agent/Null]
+$ns attach-agent $n5 $rcvr1
+$ns at 2.5 "$n5 join-group $rcvr4 $group2"
+set rcvr5 [new Agent/Null]
+$ns attach-agent $n6 $rcvr2
+$ns at 3.0 "$n6 join-group $rcvr5 $group2"
+set rcvr6 [new Agent/Null]
+$ns attach-agent $n7 $rcvr3
+#The nodes are leaving the group at specified times
+$ns at 3.5 "$n7 join-group $rcvr6 $group2"
+$ns at 4.0 "$n5 leave-group $rcvr1 $group1"
+$ns at 4.5 "$n6 leave-group $rcvr2 $group1"
+$ns at 5.0 "$n7 leave-group $rcvr3 $group1"
+$ns at 5.5 "$n5 leave-group $rcvr4 $group2"
+$ns at 6.0 "$n6 leave-group $rcvr5 $group2"
+$ns at 6.5 "$n7 leave-group $rcvr6 $group2"
+# Schedule events
+$ns at 0.5 "$cbr1 start"
+$ns at 9.5 "$cbr1 stop"
+$ns at 0.5 "$cbr2 start"
+$ns at 9.5 "$cbr2 stop"
+#post-processing
+$ns at 10.0 "finish"
+proc finish {} {
+ global ns tf
+$ns flush-trace
+close $tf
+exec nam mcast.nam &
+exit 0
+}
+$ns set-animation-rate 3.0ms
+$ns run
+
+#expr_mcast_awk.awk
+BEGIN{
+st1=0
+ft1=0
+throughput1=0
+delay1=0
+flag1=0
+data1=0
+}
+ 
 {
-    int input=(int *)inp;
-    long int res=1;
-    for(int i=1;i<=*input;i++)
-    {
-        res*=i;
-    }
-    printf("Factorial of %d is %ld",*input,res);
-}
 
-int main()
+if($1=="r"&&$4==3)
 {
-    pthread_t threads[6];
-    int n;
-    while(1>0)
-    {
-        printf("Enter your value: \n");
-
-        scanf("%d",&n);
-        pthread_create(&threads[0],NULL,calprime,(void *)&n);
-        pthread_create(&threads[1],NULL,factorial,(void *)&n);
-        pthread_create(&threads[2],NULL,armstrong,(void *)&n);
-
-        pthread_join(threads[0],NULL);
-        pthread_join(threads[1],NULL);
-        pthread_join(threads[2],NULL);
-    }
-    exit(0);
-}
---------------------------------------------------------------------------------------------------------------------------------------------------
-//producer
-#include <stdio.h>
-#include <stdlib.h>
-#include <semaphore.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <sys/shm.h>
-#include <sys/ipc.h>
-
-#define SIZE 5 // Buffer size
-
-struct shared {
-    sem_t mutex;       // Semaphore for mutual exclusion
-    sem_t empcnt;      // Semaphore for empty slots
-    sem_t fullcnt;     // Semaphore for full slots
-    int array[SIZE];   // Shared buffer
-    int front, rear;   // Indices for the buffer
-};
-
-// Function to produce an item
-int pr_it() {
-    static int a = 1;
-    return a++;
-}
-
-// Function to insert an item into the buffer
-void ins_it(struct shared *s, int item) {
-    s->rear = (s->rear + 1) % SIZE;
-    s->array[s->rear] = item;
-}
-
-// Producer thread function
-void *producer(void *arg) {
-    struct shared *s = (struct shared *)arg;
-    int item;
-    
-    while (1) {
-        item = pr_it();  // Generate an item
-        sem_wait(&s->empcnt);  // Wait for an empty slot
-        sem_wait(&s->mutex);    // Enter critical section
-
-        printf("\nProducer inserting item %d\n", item);
-        ins_it(s, item);  // Insert item into buffer
-
-        sem_post(&s->mutex);    // Exit critical section
-        sem_post(&s->fullcnt);   // Signal that a new item is produced
-
-        sleep(1);  // Simulate time taken to produce an item
-    }
-}
-
-int main() {
-    int shmid;
-    struct shared *s;
-
-    // Create shared memory
-    shmid = shmget(1234, sizeof(struct shared), 0666 | IPC_CREAT);
-    s = (struct shared *)shmat(shmid, NULL, 0);
-
-    // Initialize semaphores
-    sem_init(&s->mutex, 1, 1);
-    sem_init(&s->empcnt, 1, SIZE); // Initially all slots are empty
-    sem_init(&s->fullcnt, 1, 0);   // No items are produced
-
-    s->front = s->rear = -1; // Initialize indices
-
-    pthread_t pid;
-    pthread_create(&pid, NULL, producer, (void *)s);
-    pthread_join(pid, NULL);
-
-    // Detach and delete shared memory
-    shmdt(s);
-    shmctl(shmid, IPC_RMID, NULL);
-    return 0;
-}
-//consumer
-#include <stdio.h>
-#include <stdlib.h>
-#include <semaphore.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <sys/shm.h>
-#include <sys/ipc.h>
-
-#define SIZE 5 // Buffer size
-
-struct shared {
-    sem_t mutex;       // Semaphore for mutual exclusion
-    sem_t empcnt;      // Semaphore for empty slots
-    sem_t fullcnt;     // Semaphore for full slots
-    int array[SIZE];   // Shared buffer
-    int front, rear;   // Indices for the buffer
-};
-
-// Function to remove an item from the buffer
-int remove_item(struct shared *s) {
-    s->front = (s->front + 1) % SIZE;
-    return s->array[s->front];
-}
-
-// Consumer thread function
-void *consumer(void *arg) {
-    struct shared *s = (struct shared *)arg;
-    int item;
-    
-    while (1) {
-        sleep(2); // Simulate time taken to consume an item
-        sem_wait(&s->fullcnt);  // Wait for a full slot
-        sem_wait(&s->mutex);     // Enter critical section
-
-        item = remove_item(s);   // Remove item from buffer
-        printf("Consumer consumed item %d\n", item);
-
-        sem_post(&s->mutex);      // Exit critical section
-        sem_post(&s->empcnt);     // Signal that a slot is now empty
-    }
-}
-
-int main() {
-    int shmid;
-    struct shared *s;
-
-    // Access shared memory
-    shmid = shmget(1234, sizeof(struct shared), 0666);
-    s = (struct shared *)shmat(shmid, NULL, 0);
-
-    pthread_t cid;
-    pthread_create(&cid, NULL, consumer, (void *)s);
-    pthread_join(cid, NULL);
-
-    // Detach shared memory
-    shmdt(s);
-    return 0;
-}
---------------------------------------------------------------------------------------------------------------------------------------------------
-//dining philo
-#include<stdio.h>
-#include<pthread.h>
-#include<semaphore.h>
-#include<unistd.h>
-#define n 5
-#define left (i+n-1)%n
-#define right (i+1)%n
-#define think 0
-#define hung 1
-#define eat 2
-
-int i=1,j;
-int state[n];
-sem_t mutex;
-sem_t s[n];
-void test(int);
-void put_fork(int);
-void take_fork(int);
-void *philosopher(void *i)
+data1+=$6
+if(flag1==0)
 {
-int *p=(int *)i;
-while(1)
+st1=$2
+flag1=1
+}
+if(flag1==1)
 {
-printf("\n %d philos is think",*p);
-sleep(1);
-take_fork(*p);
-printf("\n %d philos is eating",*p);
-sleep(1);
-put_fork(*p);
+ft1=$2
+}
+}
 
 
 }
+
+END{
+
+
+printf("**********HTTP***********\n")
+printf("start time %f\n",st1)
+printf("end time %f\n",ft1)
+printf("data %f\n",data1)
+delay1=ft1-st1
+throughput1=data1/delay1
+printf("throughput %f\n",throughput1)
+printf("delay %f\n",delay1)
+
 }
-void take_fork(int i)
-{
-sem_wait(&mutex);
-state[i]=hung;
-printf("\n %d philos is hungry",i);
-test(i);
-sem_post(&mutex);
-sem_wait(&s[i]);
+******************************************************************************
+Wired Ethernet LAN 802_3
+exp10.tcl
+set ns [new Simulator]
+
+set tr [open "LAN.tr" w]
+$ns trace-all $tr
+
+set nam [open "LAN.nam" w]
+$ns namtrace-all $nam
+
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+set n6 [$ns node]
+
+$ns make-lan "$n1 $n2 $n3 $n4 $n5 $n6" 0.2Mb 20ms LL Queue/DropTail Mac/802_3
+
+set tcpsendagent1 [new Agent/TCP]
+set tcpsendagent2 [new Agent/TCP]
+
+set tcprecvagent1 [new Agent/TCPSink]
+set tcprecvagent2 [new Agent/TCPSink]
+
+$ns attach-agent $n1 $tcpsendagent1
+$ns attach-agent $n2 $tcpsendagent2
+
+$ns attach-agent $n6 $tcprecvagent1
+$ns attach-agent $n6 $tcprecvagent2
+
+set app1 [new Application/FTP]
+set app2 [new Application/FTP]
+
+$app1 attach-agent $tcpsendagent1
+$app2 attach-agent $tcpsendagent2
+
+#As soon as you create agents make sure i connect them
+
+$ns connect $tcpsendagent1 $tcprecvagent1
+$ns connect $tcpsendagent2 $tcprecvagent2
+
+$ns at 0.1 "$app1 start"
+$ns at 0.4 "$app2 start"
+
+
+
+
+proc finish { } {
+global ns tr nam
+$ns flush-trace
+close $tr
+close $nam
+exec nam LAN.nam &
+exec gawk -f anal.awk LAN.tr &
+exit 0
 }
-void put_fork(int i)
-{
-sem_wait(&mutex);
-state[i]=think;
-test(left);
-test(right);
-sem_post(&mutex);
+
+$ns at 10 "finish"
+
+$ns run
+
+#anal.awk
+BEGIN{
+drop=0
+recv=0
+starttime1=0
+endtime1=0
+latency1=0
+filesize1=0
+starttime2=0
+endtime2=0
+latency2=0
+filesize2=0
+flag0=0
+flag1=0
+bandwidth1=0
+bandwidth2=0
 }
-void test(int i)
-{
-if(state[i]==hung&&state[left]!=eat&&state[right]!=eat)
-{
-state[i]=eat;
-sem_post(&s[i]);
-}
-}
-int main()
-{
-pthread_t p1,p2,p3,p4,p5;
-int p[5]={0,1,2,3,4};
-sem_init(&mutex,0,1);
-pthread_create(&p1,NULL,philosopher,(void*)&p[0]);
-pthread_create(&p2,NULL,philosopher,(void*)&p[1]);
-pthread_create(&p3,NULL,philosopher,(void*)&p[2]);
-pthread_create(&p4,NULL,philosopher,(void*)&p[3]);
-pthread_create(&p5,NULL,philosopher,(void*)&p[4]);
-pthread_join(p1,NULL);
-pthread_join(p2,NULL);
-pthread_join(p3,NULL);
-pthread_join(p4,NULL);
-pthread_join(p5,NULL);
-return 0;
-}
---------------------------------------------------------------------------------------------------------------------------------------------------
-//deadlock
-#include <stdio.h>
-int main()
-{
-int n, m, i, j, k, avail[10],alloc[10][10],max[10][10],need[10][10];
-printf("Enter number of processes: ");
-scanf("%d",&n);
-printf("Enter number of resources: ");
-scanf("%d",&m);
-printf("Enter the number of available resources:\n");
-for(i=0;i<m;i++)
-{
-printf("Resource%d: ",i);
-scanf("%d",&avail[i]);
-}
-printf("\nEnter maximum resource demand of each process:\n");
-for(i=0;i<n;i++)
-{
-printf("Process %d :\n",i);
-for(j=0;j<m;j++)
-{
-scanf("%d",&max[i][j]);
-}
-}
-printf("\nEnter already allocated resources of each process:\n");
-for(i=0;i<n;i++)
-{
-printf("Process %d:",i);
-for(j=0;j<m;j++)
-{
-scanf("%d",&alloc[i][j]);
-}
-}
-int f[n], ans[n], ind = 0;
-for (k = 0; k < n; k++) {
-f[k] = 0; // to be used to trace which proceeses have completed
-}
-//Calculate the current need of all the processes
-for (i = 0; i < n; i++) {
-for (j = 0; j < m; j++)
-need[i][j] = max[i][j] - alloc[i][j];
-}
-int y = 0;
-for (k = 0; k < n; k++) {
-for (i = 0; i < n; i++) {
-if (f[i] == 0) {
-int flag = 0;
-for (j = 0; j < m; j++) {
-if (need[i][j] > avail[j])//Need exceeds availability
 
 {
-flag = 1; // ith process can not be completed
-break;
-}
-}
-if (flag == 0)
-{
-ans[ind++] = i;// Constructing safe sequence
-for (y = 0; y < m; y++)
-avail[y] += alloc[i][y]; // Reclaim the resource from completed process
-f[i] = 1; // Update that ith process is completed
-}
-}
-}
-}
-int flag = 1;
-for(int i=0;i<n;i++)
-{
-if(f[i]==0) // If a process could not be completed
-{
-flag=0;
-printf("The following system is not safe");
-break;
-}
-}
-if(flag==1) //All the processes can be completed
-{
-printf("Following is the SAFE Sequence\n");
-for (i = 0; i < n - 1; i++)
-printf(" P%d ->", ans[i]);
-printf(" P%d", ans[n - 1]);
-}
-return (0);
-}
---------------------------------------------------------------------------------------------------------------------------------------------------
-//peterson
-#include <stdio.h> 
-#include <stdlib.h> 
-#include <unistd.h> 
-#include <sys/wait.h> 
-#include <stdbool.h> 
-#define MAX_TICKETS 10 
-#define N 5  // Number of clients 
-// Shared data 
-int tickets = MAX_TICKETS; 
-bool interested[N] = {false}; 
-int turn[N] = {0}; 
-// Peterson's solution for n processes 
-void enter_critical_section(int process_id) { 
-for (int i = 0; i < N; i++) { 
-if (i != process_id) { 
-interested[process_id] = true; 
-turn[process_id] = i; 
-while (interested[i] && turn[i] == process_id) { 
-// Busy wait 
-} 
-} 
-} 
-} 
-void leave_critical_section(int process_id) { 
-interested[process_id] = false; 
-} 
-// Booking server simulation 
-void book_ticket(int client_id) { 
-enter_critical_section(client_id); 
-if (tickets > 0) { 
-printf("Client %d booking a ticket. Tickets remaining: %d\n", client_id, tickets - 1); 
-tickets--; 
-} else { 
-printf("Client %d could not book a ticket. No tickets remaining.\n", client_id); 
-} 
-leave_critical_section(client_id); 
-} 
-int main() { 
-pid_t pids[N]; 
-for (int i = 0; i < N; i++) { 
-if ((pids[i] = fork()) == 0) { 
-// Child process (client) 
-for (int j = 0; j < 3; j++) {  // Each client tries to book 3 times 
-book_ticket(i); 
-sleep(rand() % 3);  // Simulate some delay between booking attempts 
-} 
-exit(EXIT_SUCCESS); 
-} else if (pids[i] < 0) { 
-perror("fork"); 
-exit(EXIT_FAILURE); 
-} 
-} 
-// Parent process 
-for (int i = 0; i < N; i++) { 
-wait(NULL);  // Wait for all child processes to finish 
-} 
-return 0; 
-}
---------------------------------------------------------------------------------------------------------------------------------------------------
-//reader,writer
-#include<stdio.h>
-#include<semaphore.h>
-#include<pthread.h>
 
-sem_t wrt;
-pthread_mutex_t mutex;
-int cnt=1;
-int numreader=0;
-int i;
+if($1=="r" && $3==6)
+{
+if(flag1=0)
+{
+flag1=1
+starttime1=$2
+}
+filesize1+=$6
+endtime1=$2
+latency=endtime1-starttime1
+bandwidth1=filesize1/latency
+printf "%f %f\n", endtime1, bandwidth1 >> "file3.xg"
 
-void *writer(void *wno)
-{
-sem_wait(&wrt);
-cnt=cnt*2;
-printf("writer %d modified cnt:%d\n",(*((int*)wno)),cnt);
-sem_post(&wrt);
 }
-void *reader(void *rno)
-{
-pthread_mutex_lock(&mutex);
-numreader++;
-if(numreader==1)
-{
-  sem_wait(&wrt);
+
 }
-pthread_mutex_unlock(&mutex);
-printf("reader: %d read cnt:%d\n",*((int *)rno),cnt);
-pthread_mutex_lock(&mutex);
-numreader--;
-if(numreader==0)
-{
-sem_post(&wrt);
+END{
+print("\n\n\n Final Values..")
+print("\n\nfilesize : ",filesize1)
+latency=endtime1-starttime1
+print("\nlatency :",latency)
+bandwidth1=filesize1/latency
+print("\n Throughput (Mbps):",bandwidth1/10^6)
 }
-pthread_mutex_unlock(&mutex);
-}
-int main()
-{
-pthread_t r[10],w[5];
-pthread_mutex_init(&mutex,NULL);
-sem_init(&wrt,0,1);
-for(i=0;i<10;i++)
-{
-pthread_create(&r[i],NULL,(void *)reader,(void *)&i);
-}
-for( i=0;i<5;i++)
-{
-     pthread_create(&w[i],NULL,(void *)writer,(void *)&i);
-}
-for( i=0;i<10;i++)
-{
-pthread_join(r[i],NULL);
-}
-for( i=0;i<5;i++)
-{
-pthread_join(w[i],NULL);
-}
-pthread_mutex_destroy(&mutex);
-sem_destroy(&wrt);
-return 0;
-}
---------------------------------------------------------------------------------------------------------------------------------------------------
 
