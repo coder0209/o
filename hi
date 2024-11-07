@@ -1,631 +1,1908 @@
-5.wireless.tcl
-set val(chan) Channel/WirelessChannel ;#Channel Type
-set val(prop) Propagation/TwoRayGround ;# radio-propagation model
-set val(netif) Phy/WirelessPhy ;# network interface type WAVELAN DSSS 2.4GHz
-set val(mac) Mac/802_11 ;# MAC type
-set val(ifq) Queue/DropTail/PriQueue ;# interface queue type
-set val(ll) LL ;# link layer type
-set val(ant) Antenna/OmniAntenna ;# antenna model
-set val(ifqlen) 50 ;# max packet in ifq
-set val(nn) 6 ;# number of mobilenodes
-set val(rp) AODV ;# routing protocol
-set val(x) 500 ;# in metresset
-set val(y) 500 ;# in metres
-#Adhoc OnDemand Distance Vector
-#Creation of Simulator
-set ns [new Simulator]
-
-#Creation of Trace and namefile
-set tracefile [open wireless.tr w]
-$ns trace-all $tracefile
-
-#Creation of Network Animation file
-set namfile [open wireless.nam w]
-$ns namtrace-all-wireless $namfile $val(x) $val(y)
-
-#Create Topography
-set topo [new Topography]
-$topo load_flatgrid $val(x) $val(y)
-
-#GOD Creation - General Operations Director
-create-god $val(nn)
-
-set channel1 [new $val(chan)]
-set channel2 [new $val(chan)]
-set channel3 [new $val(chan)]
-
-#Configure the Node
-$ns node-config -adhocRouting $val(rp) \
--llType $val(ll) \
--macType $val(mac) \
--ifqType $val(ifq) \
--ifqLen $val(ifqlen) \
--antType $val(ant) \
--propType $val(prop) \
--phyType $val(netif) \
--topoInstance $topo \
--agentTrace ON \
--macTrace ON \
--routerTrace ON \
--movementTrace ON \
--channel $channel1
-
-set n0 [$ns node]
-set n1 [$ns node]
-set n2 [$ns node]
-set n3 [$ns node]
-set n4 [$ns node]
-set n5 [$ns node]
-
-$n0 random-motion 0
-$n1 random-motion 0
-$n2 random-motion 0
-$n3 random-motion 0
-$n4 random-motion 0
-$n5 random-motion 0
-
-$ns initial_node_pos $n0 20
-$ns initial_node_pos $n1 20
-$ns initial_node_pos $n2 20
-$ns initial_node_pos $n3 20
-$ns initial_node_pos $n4 20
-$ns initial_node_pos $n5 50
-
-#Initial coordinates of the nodes
-
-$n0 set X_ 10.0
-$n0 set Y_ 20.0
-$n0 set Z_ 0.0
-
-$n1 set X_ 210.0
-$n1 set Y_ 230.0
-$n1 set Z_ 0.0
-
-$n2 set X_ 100.0
-$n2 set Y_ 200.0
-$n2 set Z_ 0.0
-
-$n3 set X_ 150.0
-$n3 set Y_ 230.0
-$n3 set Z_ 0.0
-
-$n4 set X_ 430.0
-$n4 set Y_ 320.0
-$n4 set Z_ 0.0
-
-$n5 set X_ 270.0
-$n5 set Y_ 120.0
-$n5 set Z_ 0.0
-#Dont mention any values above than 500 because in this example, we use X and Y as 500,500
-
-#Mobility of the nodes
-#At what Time? Which node? Where to? at What Speed?
-$ns at 1.0 "$n1 setdest 490.0 340.0 25.0"
-$ns at 1.0 "$n4 setdest 300.0 130.0 5.0"
-$ns at 1.0 "$n5 setdest 190.0 440.0 15.0"
-
-#The nodes can move any number of times at any location during the simulation (runtime)
-$ns at 20.0 "$n5 setdest 100.0 200.0 30.0"
-
-#Creation of agents
-set tcp [new Agent/TCP]
-set sink [new Agent/TCPSink]
-$ns attach-agent $n0 $tcp
-$ns attach-agent $n5 $sink
-$ns connect $tcp $sink
-set ftp [new Application/FTP]
-$ftp attach-agent $tcp
-$ns at 1.0 "$ftp start"
-
-set udp [new Agent/UDP]
-set null [new Agent/Null]
-$ns attach-agent $n2 $udp
-$ns attach-agent $n3 $null
-$ns connect $udp $null
-set cbr [new Application/Traffic/CBR]
-$cbr attach-agent $udp
-$ns at 1.0 "$cbr start"
-
-$ns at 30.0 "finish"
-
-proc finish {} {
-global ns tracefile namfile
-$ns flush-trace
-close $tracefile
-close $namfile
-exit 0
-
-}
-
-puts "Starting Simulation"
-$ns run
-
-delay-calc-WNS.awk
-BEGIN {
-    seqno = -1;
-    droppedPackets = 0;
-    receivedPackets = 0;
-    count = 0;
-}
-{
-    #packet delivery ratio
-    if($4 == "AGT" && $1 == "s" && seqno < $6) {
-        seqno = $6;
-    } else if(($4 == "AGT") && ($1 == "r")) {
-        receivedPackets++;
-    } else if ($1 == "D" && $7 == "tcp" && $8 > 512){
-        droppedPackets++;
-    }
-
-    #end-to-end delay
-    if($4 == "AGT" && $1 == "s") {
-        start_time[$6] = $2;
-    } else if(($7 == "tcp") && ($1 == "r")) {
-        end_time[$6] = $2;
-    } else if($1 == "D" && $7 == "tcp") {
-        end_time[$6] = -1;
-    }
-}
-END {
-    for(i=0; i<=seqno; i++) {
-        if(end_time[i] > 0) {
-            delay[i] = end_time[i] - start_time[i];
-        count++;
-        } else {
-            delay[i] = -1;
-        }
-    }
-
-    for(i=0; i<count; i++) {
-        if(delay[i] > 0) {
-            n_to_n_delay = n_to_n_delay + delay[i];
-        }
-    }
-
-    n_to_n_delay = n_to_n_delay/count;
-    print "\n";
-    print "GeneratedPackets = " seqno+1;
-    print "ReceivedPackets = " receivedPackets;
-    print "Packet Delivery Ratio = "receivedPackets/(seqno+1)*100"%";
-    print "Total Dropped Packets = " droppedPackets;
-    print "Average End-to-End Delay = " n_to_n_delay * 1000 " ms";
-    print "\n";
-}
-***********************************************************************
-DISTANCE VECTOR
-DV.tcl
-set ns [new Simulator]
-$ns rtproto DV
-$ns color 1 green
-set node0 [$ns node]
-set node1 [$ns node]
-set node2 [$ns node]
-set node3 [$ns node]
-set node4 [$ns node]
-
-set node5 [$ns node]
-set node6 [$ns node]
-set tf [open out_dv.tr w]
-$ns trace-all $tf
-set nf [open out_dv.nam w]
-$ns namtrace-all $nf
-
-set ft [open "dvr_th" "w"]
-$node0 label "node 0"
-$node1 label "node 1"
-$node2 label "node 2"
-$node3 label "node 3"
-$node4 label "node 4"
-
-$node5 label "node 5"
-$node6 label "node 6"
-$ns duplex-link $node0 $node1 1.5Mb 10ms DropTail
-$ns duplex-link $node1 $node2 1.5Mb 10ms DropTail
-$ns duplex-link $node2 $node3 1.5Mb 10ms DropTail
-$ns duplex-link $node3 $node4 1.5Mb 10ms DropTail
-
-$ns duplex-link $node4 $node5 1.5Mb 10ms DropTail
-$ns duplex-link $node5 $node6 1.5Mb 10ms DropTail
-$ns duplex-link $node6 $node0 1.5Mb 10ms DropTail
-$ns duplex-link-op $node0 $node1 orient left-down
-$ns duplex-link-op $node1 $node2 orient left-down
-$ns duplex-link-op $node2 $node3 orient right-down
-$ns duplex-link-op $node3 $node4 orient right
-$ns duplex-link-op $node4 $node5 orient right-up
-$ns duplex-link-op $node5 $node6 orient left-up
-$ns duplex-link-op $node6 $node0 orient left-up
-
-set tcp2 [new Agent/TCP]
-$tcp2 set class_ 1
-$ns attach-agent $node0 $tcp2
-set sink2 [new Agent/TCPSink]
-$ns attach-agent $node3 $sink2
-$ns connect $tcp2 $sink2
-set traffic_ftp2 [new Application/FTP]
-
-$traffic_ftp2 attach-agent $tcp2
-proc record {} {
-global sink2 tf ft
-global ftp
-set ns [Simulator instance]
-set time 0.1
-set now [$ns now]
-set bw0 [$sink2 set bytes_]
-puts $ft "$now [expr $bw0/$time*8/1000000]"
-$sink2 set bytes_ 0
-$ns at [expr $now+$time] "record"
-}
-
-proc finish {} {
-global ns nf
-$ns flush-trace
-close $nf
-exec nam out_dv.nam &
-exec xgraph dvr_th &
-exit 0
-}
-
-$ns at 0.55 "record"
-#Schedule events for the CBR agents
-$ns at 0.5 "$node0 color \"Green\""
-$ns at 0.5 "$node3 color \"Green\""
-$ns at 0.5 "$ns trace-annotate \"Starting FTP node0 to node6\""
-$ns at 0.5 "$node0 label-color green"
-$ns at 0.5 "$node3 label-color green"
-$ns at 0.5 "$traffic_ftp2 start"
-$ns at 0.5 "$node1 label-color green"
-
-$ns at 0.5 "$node2 label-color green"
-$ns at 0.5 "$node4 label-color blue"
-$ns at 0.5 "$node5 label-color blue"
-$ns at 0.5 "$node6 label-color blue"
-$ns rtmodel-at 2.0 down $node2 $node3
-
-$ns at 2.0 "$node4 label-color green"
-$ns at 2.0 "$node5 label-color green"
-$ns at 2.0 "$node6 label-color green"
-$ns at 2.0 "$node1 label-color blue"
-$ns at 2.0 "$node2 label-color blue"
-
-$ns rtmodel-at 3.0 up $node2 $node3
-$ns at 3.0 "$traffic_ftp2 start"
-$ns at 4.9 "$traffic_ftp2 stop"
-$ns at 5.0 "finish"
-$ns run
-*************************************************************************
-LINKSTATE
-LS.tcl
-set ns [new Simulator]
-$ns rtproto LS
-$ns color 1 green
-set node0 [$ns node]
-set node1 [$ns node]
-set node2 [$ns node]
-set node3 [$ns node]
-set node4 [$ns node]
-set node5 [$ns node]
-set node6 [$ns node]
-set tf [open out_ls.tr w]
-$ns trace-all $tf
-set nf [open out_ls.nam w]
-$ns namtrace-all $nf
-set ft [open "lsr_th" "w"]
-$node0 label "node 0"
-$node1 label "node 1"
-$node2 label "node 2"
-$node3 label "node 3"
-$node4 label "node 4"
-$node5 label "node 5"
-$node6 label "node 6"
-$ns duplex-link $node0 $node1 1.5Mb 10ms DropTail
-$ns duplex-link $node1 $node2 1.5Mb 10ms DropTail
-$ns duplex-link $node2 $node3 1.5Mb 10ms DropTail
-$ns duplex-link $node3 $node4 1.5Mb 10ms DropTail
-$ns duplex-link $node4 $node5 1.5Mb 10ms DropTail
-$ns duplex-link $node5 $node6 1.5Mb 10ms DropTail
-$ns duplex-link $node6 $node0 1.5Mb 10ms DropTail
-
-$ns duplex-link-op $node0 $node1 orient left-down
-$ns duplex-link-op $node1 $node2 orient left-down
-$ns duplex-link-op $node2 $node3 orient right-down
-$ns duplex-link-op $node3 $node4 orient right
-$ns duplex-link-op $node4 $node5 orient right-up
-$ns duplex-link-op $node5 $node6 orient left-up
-$ns duplex-link-op $node6 $node0 orient left-up
-
-set tcp2 [new Agent/TCP]
-$tcp2 set class_ 1
-$ns attach-agent $node0 $tcp2
-set sink2 [new Agent/TCPSink]
-$ns attach-agent $node3 $sink2
-$ns connect $tcp2 $sink2
-
-set traffic_ftp2 [new Application/FTP]
-$traffic_ftp2 attach-agent $tcp2
-proc record {} {
-global sink2 tf ft
-global ftp
-
-set ns [Simulator instance]
-set time 0.1
-set now [$ns now]
-set bw0 [$sink2 set bytes_]
-puts $ft "$now [expr $bw0/$time*8/1000000]"
-$sink2 set bytes_ 0
-$ns at [expr $now+$time] "record"
-}
-
-proc finish {} {
-global ns nf
-$ns flush-trace
-close $nf
-
-exec nam out_ls.nam &
-exec xgraph lsr_th &
-exit 0
-}
-
-$ns at 0.55 "record"
-#Schedule events for the CBR agents
-$ns at 0.5 "$node0 color \"Green\""
-$ns at 0.5 "$node3 color \"Green\""
-$ns at 0.5 "$ns trace-annotate \"Starting FTP node0 to node3\""
-$ns at 0.5 "$node0 label-color green"
-$ns at 0.5 "$node3 label-color green"
-
-$ns at 0.5 "$traffic_ftp2 start"
-$ns at 0.5 "$node1 label-color green"
-$ns at 0.5 "$node2 label-color green"
-$ns at 0.5 "$node4 label-color blue"
-$ns at 0.5 "$node5 label-color blue"
-$ns at 0.5 "$node6 label-color blue"
-$ns rtmodel-at 2.0 down $node2 $node3
-$ns at 2.0 "$node4 label-color green"
-$ns at 2.0 "$node5 label-color green"
-$ns at 2.0 "$node6 label-color green"
-$ns at 2.0 "$node1 label-color blue"
-$ns at 2.0 "$node2 label-color blue"
-$ns rtmodel-at 3.0 up $node2 $node3
-$ns at 3.0 "$traffic_ftp2 start"
-$ns at 4.9 "$traffic_ftp2 stop"
-$ns at 5.0 "finish"
-$ns run
-***************************************************************************
-MULTICAST
-exp8.tcl
-set ns [new Simulator -multicast on]
-#Turn on Tracing
-set tf [open output.tr w]
-$ns trace-all $tf
-# Turn on nam Tracing
-set fd [open mcast.nam w]
-$ns namtrace-all $fd
-# Create nodes
-set n0 [$ns node]
-set n1 [$ns node]
-set n2 [$ns node]
-set n3 [$ns node]
-set n4 [$ns node]
-set n5 [$ns node]
-set n6 [$ns node]
-set n7 [$ns node]
-# Create links with DropTail Queues
-$ns duplex-link $n0 $n2 1.5Mb 10ms DropTail
-$ns duplex-link $n1 $n2 1.5Mb 10ms DropTail
-$ns duplex-link $n2 $n3 1.5Mb 10ms DropTail
-$ns duplex-link $n3 $n4 1.5Mb 10ms DropTail
-$ns duplex-link $n3 $n7 1.5Mb 10ms DropTail
-$ns duplex-link $n4 $n5 1.5Mb 10ms DropTail
-$ns duplex-link $n4 $n6 1.5Mb 10ms DropTail
-set mproto DM
-set mrthandle [$ns mrtproto $mproto {}]
-# Set two groups with group addresses
-set group1 [Node allocaddr]
-set group2 [Node allocaddr]
-# UDP Transport agent for the traffic source forgroup1
-set udp0 [new Agent/UDP]
-$ns attach-agent $n0 $udp0
-$udp0 set dst_addr_ $group1
-$udp0 set dst_port_ 0
-set cbr1 [new Application/Traffic/CBR]
-$cbr1 attach-agent $udp0
-# Transport agent for the traffic source for group2
-set udp1 [new Agent/UDP]
-$ns attach-agent $n1 $udp1
-$udp1 set dst_addr_ $group2
-$udp1 set dst_port_ 0
-set cbr2 [new Application/Traffic/CBR]
-$cbr2 attach-agent $udp1
-# Create receiver to accept the packets
-set rcvr1 [new Agent/Null]
-$ns attach-agent $n5 $rcvr1
-$ns at 1.0 "$n5 join-group $rcvr1 $group1"
-set rcvr2 [new Agent/Null]
-$ns attach-agent $n6 $rcvr2
-$ns at 1.5 "$n6 join-group $rcvr2 $group1"
-set rcvr3 [new Agent/Null]
-$ns attach-agent $n7 $rcvr3
-$ns at 2.0 "$n7 join-group $rcvr3 $group1"
-set rcvr4 [new Agent/Null]
-$ns attach-agent $n5 $rcvr1
-$ns at 2.5 "$n5 join-group $rcvr4 $group2"
-set rcvr5 [new Agent/Null]
-$ns attach-agent $n6 $rcvr2
-$ns at 3.0 "$n6 join-group $rcvr5 $group2"
-set rcvr6 [new Agent/Null]
-$ns attach-agent $n7 $rcvr3
-#The nodes are leaving the group at specified times
-$ns at 3.5 "$n7 join-group $rcvr6 $group2"
-$ns at 4.0 "$n5 leave-group $rcvr1 $group1"
-$ns at 4.5 "$n6 leave-group $rcvr2 $group1"
-$ns at 5.0 "$n7 leave-group $rcvr3 $group1"
-$ns at 5.5 "$n5 leave-group $rcvr4 $group2"
-$ns at 6.0 "$n6 leave-group $rcvr5 $group2"
-$ns at 6.5 "$n7 leave-group $rcvr6 $group2"
-# Schedule events
-$ns at 0.5 "$cbr1 start"
-$ns at 9.5 "$cbr1 stop"
-$ns at 0.5 "$cbr2 start"
-$ns at 9.5 "$cbr2 stop"
-#post-processing
-$ns at 10.0 "finish"
-proc finish {} {
- global ns tf
-$ns flush-trace
-close $tf
-exec nam mcast.nam &
-exit 0
-}
-$ns set-animation-rate 3.0ms
-$ns run
-
-#expr_mcast_awk.awk
-BEGIN{
-st1=0
-ft1=0
-throughput1=0
-delay1=0
-flag1=0
-data1=0
+OS-LAB
+ 
+3.CPU SCHEDULING:
+ 
+1.FCFS:
+#include<stdio.h>   // Including standard input-output header file
+#include<stdlib.h>  // Including standard library header file (not used in this program)
+ 
+// Defining a structure to represent each process
+struct node {
+   int arr;   // Arrival time of the process
+   int ct;    // Completion time of the process
+   int bur;   // Burst time (execution time) of the process
+};
+ 
+int main() {
+   struct node obj[100];  // Array to store up to 100 processes
+   int n, i, j;           // Declaring variables for loop control and number of processes
+ 
+   // Asking the user to input the number of processes
+   printf("Enter the number of processes\n");
+   scanf("%d", &n);  // Storing the number of processes in variable 'n'
+ 
+   // Loop to input the arrival time and burst time for each process
+   for(i = 0; i < n; i++) {
+       printf("Enter the arrival time of process %d\n", i+1);
+       scanf("%d", &obj[i].arr);  // Input arrival time for the process
+ 
+       printf("Enter the burst time of process %d\n", i+1);
+       scanf("%d", &obj[i].bur);  // Input burst time for the process
+ 
+       obj[i].ct = 0;  // Initializing the completion time to 0
+   }
+ 
+   // Sorting processes based on their arrival time using bubble sort
+   struct node temp;  // Temporary variable for swapping processes
+   for(i = 0; i < n-1; i++) {
+       for(j = i + 1; j < n; j++) {
+           if(obj[i].arr > obj[j].arr) {  // If the current process arrives later than the next process
+               temp = obj[j];  // Swap the processes
+               obj[j] = obj[i];
+               obj[i] = temp;
+           }
+       }
+   }
+ 
+   // Declaring arrays to store waiting time and turnaround time for each process
+   int wt[n];   // Array for waiting time
+   int tat[n];  // Array for turnaround time
+ 
+   // Calculating the completion time, turnaround time, and waiting time for the first process
+   obj[0].ct = obj[0].arr + obj[0].bur;  // Completion time for the first process
+   tat[0] = obj[0].ct - obj[0].arr;      // Turnaround time = Completion time - Arrival time
+   wt[0] = tat[0] - obj[0].bur;          // Waiting time = Turnaround time - Burst time
+ 
+   // Loop to calculate the same for all remaining processes
+   for(i = 1; i < n; i++) {
+       obj[i].ct = obj[i-1].ct + obj[i].bur;  // Completion time = Previous process's completion time + current burst time
+       tat[i] = obj[i].ct - obj[i].arr;       // Turnaround time = Completion time - Arrival time
+       wt[i] = tat[i] - obj[i].bur;           // Waiting time = Turnaround time - Burst time
+   }
+ 
+   // Printing the results in a tabular format
+   printf("AT\tBT\tCT\tWT\tTAT\n");  // Header for the table
+   for(i = 0; i < n; i++) {
+       printf("%d\t%d\t%d\t%d\t%d\n", obj[i].arr, obj[i].bur, obj[i].ct, wt[i], tat[i]);
+       // Print Arrival Time, Burst Time, Completion Time, Waiting Time, and Turnaround Time for each process
+   }
+ 
+   return 0;  // End of the program, returning 0 indicates successful execution
 }
  
+
+2.Round Robin:
+#include<stdio.h>   // Including standard input-output header file
+ 
+// Defining a structure to represent each process
+struct process {
+   int at;  // Arrival time of the process
+   int bt;  // Burst time (execution time) of the process
+   int rt;  // Remaining time of the process
+   int ft;  // Finish time (completion time) of the process
+   int wt;  // Waiting time of the process
+   int tat; // Turnaround time of the process
+   int status; // Status to indicate if the process is completed
+} p[10];     // Array of processes, assuming a maximum of 10 processes
+ 
+int n, time_quantum;  // Variables to store the number of processes and the time quantum
+ 
+// Function prototype for the dispatcher function
+void dispatcher();
+ 
+int main() {
+   int i, ctime = 0;  // Current time initialization to 0
+ 
+   // Prompting the user to input the total number of processes
+   printf("Enter Total Processes:\t");
+   scanf("%d", &n);  // Storing the number of processes in variable 'n'
+ 
+   // Loop to input the arrival time and burst time for each process
+   for(i = 0; i < n; i++) {
+       printf("Enter Arrival Time and Burst Time for Process Number %d: ", i+1);
+       scanf("%d", &p[i].at);  // Input arrival time for the process
+       scanf("%d", &p[i].bt);  // Input burst time for the process
+       p[i].rt = p[i].bt;      // Initialize remaining time with burst time
+       p[i].status = 0;        // Initialize status as not completed
+   }
+ 
+   // Prompting the user to input the time quantum
+   printf("Enter Time Quantum:\t");
+   scanf("%d", &time_quantum);  // Storing the time quantum in variable 'time_quantum'
+ 
+   dispatcher();  // Calling the dispatcher function to simulate Round Robin scheduling
+ 
+   // Printing the results in a tabular format
+   printf("\n\nProcess\t|Finish Time\t|Turnaround Time|Waiting Time\n\n");
+   for(i = 0; i < n; i++) {
+       // Print Process ID, Finish Time, Turnaround Time, and Waiting Time
+       printf("P[%d]\t|\t%d\t|\t%d\t|\t%d\n", i+1, p[i].ft, p[i].tat, p[i].wt);
+   }
+ 
+   return 0;  // End of the program, returning 0 indicates successful execution
+}
+ 
+// Function to simulate the Round Robin scheduling algorithm
+void dispatcher() {
+   int CT = 0, pid = 0, count = 0;  // CT - Clock time, pid - process ID, count - number of completed processes
+ 
+   // Loop until all processes are completed
+   while(count < n) {
+       // Check if the current process is ready to execute
+       if(p[pid].rt > 0 && p[pid].at <= CT) {
+           // If the current process can complete within the time quantum
+           if(p[pid].rt <= time_quantum) {
+               CT += p[pid].rt;  // Increase clock time by the remaining time of the process
+               p[pid].rt = 0;    // Set the remaining time to 0 (process completed)
+               p[pid].ft = CT;   // Set the finish time for the process
+               p[pid].tat = p[pid].ft - p[pid].at;  // Calculate turnaround time
+               p[pid].wt = p[pid].tat - p[pid].bt;  // Calculate waiting time
+               p[pid].status = 1; // Mark process as completed
+               count++;           // Increment the count of completed processes
+           } else {
+               p[pid].rt -= time_quantum;  // Reduce remaining time by the time quantum
+               CT += time_quantum;         // Increase clock time by the time quantum
+           }
+       }
+ 
+       // Move to the next process in a round-robin manner
+       pid = (pid + 1) % n;  // Circular increment of process ID
+   }
+}
+ 
+ 
+3.SJF:
+#include<stdio.h>   // Including standard input-output header file
+#include<stdlib.h>  // Including standard library header file (not used in this program)
+ 
+// Defining a structure to represent each process
+struct node {
+   int arr;  // Arrival time of the process
+   int ct;   // Completion time of the process
+   int bur;  // Burst time (execution time) of the process
+};
+ 
+int main() {
+   struct node obj[100];  // Array to store up to 100 processes
+   int n, i, j, k, m;     // Declaring variables for loop control and number of processes
+ 
+   // Asking the user to input the number of processes
+   printf("Enter the number of processes\n");
+   scanf("%d", &n);  // Storing the number of processes in variable 'n'
+ 
+   // Loop to input the arrival time and burst time for each process
+   for(i = 0; i < n; i++) {
+       printf("Enter the arrival time of process %d\n", i+1);
+       scanf("%d", &obj[i].arr);  // Input arrival time for the process
+ 
+       printf("Enter the burst time of process %d\n", i+1);
+       scanf("%d", &obj[i].bur);  // Input burst time for the process
+ 
+       obj[i].ct = 0;  // Initializing the completion time to 0
+   }
+ 
+   // Sorting processes based on their arrival time using bubble sort
+   struct node temp;  // Temporary variable for swapping processes
+   for(i = 0; i < n-1; i++) {
+       for(j = i+1; j < n; j++) {
+           if(obj[i].arr > obj[j].arr) {  // If the current process arrives later than the next process
+               temp = obj[j];  // Swap the processes
+               obj[j] = obj[i];
+               obj[i] = temp;
+           }
+       }
+   }
+ 
+   // Implementing SJF (Shortest Job First) Non-Preemptive Scheduling
+   struct node n1;  // Temporary variable for swapping based on burst time
+   int wt[n];       // Array for waiting time
+   int tat[n];      // Array for turnaround time
+ 
+   // Calculate the completion time, turnaround time, and waiting time for the first process
+   obj[0].ct = obj[0].arr + obj[0].bur;  // Completion time for the first process
+   tat[0] = obj[0].ct - obj[0].arr;      // Turnaround time = Completion time - Arrival time
+   wt[0] = tat[0] - obj[0].bur;          // Waiting time = Turnaround time - Burst time
+ 
+   int time = obj[0].ct;  // Initialize the current time to the completion time of the first process
+ 
+   // Loop to calculate the same for all remaining processes
+   for(i = 0; i < n-1; i++) {
+       int count = 0;
+       int sum = 0;
+ 
+       // Calculate the sum of arrival times of the subsequent processes until one is ready
+       for(j = i+1; j < n; j++) {
+           sum += obj[j].arr;
+           count++;
+           if(sum >= time) {  // If the next process arrives after the current time, break
+               break;
+           }
+       }
+ 
+       // Sort the processes that have arrived based on burst time (Shortest Job First)
+       for(k = i+1; k <= i+count; k++) {
+           for(m = i+1; m <= i+count; m++) {
+               if(obj[k].bur < obj[m].bur) {  // If a process has a shorter burst time, swap it to the front
+                   n1 = obj[k];
+                   obj[k] = obj[m];
+                   obj[m] = n1;
+               }
+           }
+       }
+ 
+       // Calculate the completion time, turnaround time, and waiting time for the next process
+       obj[i+1].ct = obj[i].ct + obj[i+1].bur;  // Completion time = Previous process's completion time + current burst time
+       tat[i+1] = obj[i+1].ct - obj[i+1].arr;   // Turnaround time = Completion time - Arrival time
+       wt[i+1] = tat[i+1] - obj[i+1].bur;       // Waiting time = Turnaround time - Burst time
+   }
+ 
+   // Printing the results in a tabular format
+   printf("AT\tBT\tCT\tWT\tTAT\n");  // Header for the table
+   for(i = 0; i < n; i++) {
+       printf("%d\t%d\t%d\t%d\t%d\n", obj[i].arr, obj[i].bur, obj[i].ct, wt[i], tat[i]);
+       // Print Arrival Time, Burst Time, Completion Time, Waiting Time, and Turnaround Time for each process
+   }
+ 
+   return 0;  // End of the program, returning 0 indicates successful execution
+}
+ 
+ 
+4.SRJF:
+#include<stdio.h>   // Including standard input-output header file
+#include<stdlib.h>  // Including standard library header file (not used in this program)
+ 
+// Defining a structure to represent each process
+struct node {
+   int arr;   // Arrival time of the process
+   int ct;    // Completion time of the process
+   int bur;   // Burst time (total execution time) of the process
+   int rem;   // Remaining burst time of the process
+   int stat;  // Status of the process (whether it's completed)
+   int wt;    // Waiting time of the process
+   int tat;   // Turnaround time of the process
+};
+ 
+int main() {
+   struct node obj[100];  // Array to store up to 100 processes
+   int n, i, j, k, m;     // Declaring variables for loop control and number of processes
+ 
+   // Asking the user to input the number of processes
+   printf("Enter the number of processes\n");
+   scanf("%d", &n);  // Storing the number of processes in variable 'n'
+ 
+   // Loop to input the arrival time and burst time for each process
+   for(i = 0; i < n; i++) {
+       printf("Enter the arrival time of process %d\n", i+1);
+       scanf("%d", &obj[i].arr);  // Input arrival time for the process
+ 
+       printf("Enter the burst time of process %d\n", i+1);
+       scanf("%d", &obj[i].bur);  // Input burst time for the process
+ 
+       obj[i].ct = 0;              // Initializing the completion time to 0
+       obj[i].rem = obj[i].bur;    // Remaining burst time is initially the same as burst time
+       obj[i].stat = 0;            // Initializing the status to 0 (not completed)
+   }
+ 
+   // Sorting processes based on their arrival time using bubble sort
+   struct node temp;  // Temporary variable for swapping processes
+   for(i = 0; i < n-1; i++) {
+       for(j = i+1; j < n; j++) {
+           if(obj[i].arr > obj[j].arr) {  // If the current process arrives later than the next process
+               temp = obj[j];  // Swap the processes
+               obj[j] = obj[i];
+               obj[i] = temp;
+           }
+       }
+   }
+ 
+   // Implementing SRJF (Shortest Remaining Job First) Scheduling
+   int count = 0;  // Counter to track the number of completed processes
+   int time = 0;   // Variable to track the current time
+ 
+   // Main loop to execute the SRJF algorithm
+   while(count != n) {
+       int s = -1;  // Variable to hold the index of the process with the shortest remaining time
+ 
+       // Loop through all processes to find the one with the shortest remaining time that has arrived
+       for(i = 0, count = 0; i < n; i++) {
+           if(obj[i].rem == 0) {  // If the process is already completed
+               count++;           // Increment the count of completed processes
+               obj[i].stat = 1;   // Mark the process as completed
+               continue;          // Skip to the next process
+           }
+           if(obj[i].arr <= time) {  // If the process has arrived by the current time
+               if(s == -1 || obj[i].rem < obj[s].rem) {  // If this process has the shortest remaining time
+                   s = i;  // Set this process as the one to execute
+               }
+           }
+       }
+ 
+       // If no process has arrived, increment the time and continue
+       if(s == -1) {
+           time++;
+           continue;
+       }
+ 
+       // Execute the process with the shortest remaining time
+       obj[s].rem--;  // Decrease the remaining burst time
+       time++;        // Increment the current time
+       obj[s].ct = time;  // Update the completion time for the process
+ 
+       // If the process is now completed, increment the count of completed processes
+       if(obj[s].rem == 0) {
+           count++;
+       }
+   }
+ 
+   // Calculate Turnaround Time (TAT) and Waiting Time (WT) for each process
+   for(i = 0; i < n; i++) {
+       obj[i].tat = obj[i].ct - obj[i].arr;  // TAT = Completion Time - Arrival Time
+       obj[i].wt = obj[i].tat - obj[i].bur;  // WT = TAT - Burst Time
+   }
+ 
+   // Printing the results in a tabular format
+   printf("AT\tBT\tCT\tWT\tTAT\n");  // Header for the table
+   for(i = 0; i < n; i++) {
+       printf("%d\t%d\t%d\t%d\t%d\n", obj[i].arr, obj[i].bur, obj[i].ct, obj[i].wt, obj[i].tat);
+       // Print Arrival Time, Burst Time, Completion Time, Waiting Time, and Turnaround Time for each process
+   }
+ 
+   return 0;  // End of the program, returning 0 indicates successful execution
+}
+ 
+ 
+Ex 1 - Parent Child Communication using Pipe
+#include<stdio.h>
+#include<sys/types.h>
+#include<unistd.h>
+int main()
 {
-
-if($1=="r"&&$4==3)
+int p[2];
+int pid;
+char inbuf[10],outbuf[10];
+pipe(p); //To send message between parent and child //
+pid=fork(); // Fork call to create child process //
+if(pid) //// Code of Parent process
 {
-data1+=$6
-if(flag1==0)
+printf("In parent process\n");
+printf("type the data to be sent to child");
+scanf("%s",outbuf); // Writing a message into the pipe
+write (p[1],outbuf, sizeof(outbuf)); //p[1] indicates write
+sleep(2); // To allow the child to run
+printf("after sleep in parent process\n");
+}
+else // Coding of child process //
 {
-st1=$2
-flag1=1
+sleep(2);
+printf("In child process\n");
+read(p[0],inbuf,10); // Read the message written by parent
+printf("the data received by the child is %s\n",inbuf);
 }
-if(flag1==1)
+return 0;
+}
+ 
+ 
+Ex 2A - Interprocess Communication using Shared
+Memory
+SERVER:
+#include<stdio.h>
+#include<sys/types.h>
+#include<sys/ipc.h>
+#include<sys/shm.h>
+#include<unistd.h>
+#include<string.h>
+#define SHMSZ 50
+void main()
 {
-ft1=$2
+char c;
+int shmid;
+key_t key;
+char*shm,*s;
+key=5678; // A random number used as key
+shmid=shmget(key,SHMSZ,IPC_CREAT|0666); // Create shared
+//memory
+shm=(char*)shmat(shmid,NULL,0); //Attach shared memory
+s=shm; // Temporary pointer to avoid moving shm from base address of
+//shared memory
+printf("Enter the message you want to send: ");
+scanf("%s", s); // Message copied into Shared memory directly through
+//spointer
+while(*shm!='*') // Sender waits until received acknowledge it has read
+//by appending * into shared memory
+sleep(1);
 }
-}
-
-
-}
-
-END{
-
-
-printf("**********HTTP***********\n")
-printf("start time %f\n",st1)
-printf("end time %f\n",ft1)
-printf("data %f\n",data1)
-delay1=ft1-st1
-throughput1=data1/delay1
-printf("throughput %f\n",throughput1)
-printf("delay %f\n",delay1)
-
-}
-******************************************************************************
-Wired Ethernet LAN 802_3
-exp10.tcl
-set ns [new Simulator]
-
-set tr [open "LAN.tr" w]
-$ns trace-all $tr
-
-set nam [open "LAN.nam" w]
-$ns namtrace-all $nam
-
-set n1 [$ns node]
-set n2 [$ns node]
-set n3 [$ns node]
-set n4 [$ns node]
-set n5 [$ns node]
-set n6 [$ns node]
-
-$ns make-lan "$n1 $n2 $n3 $n4 $n5 $n6" 0.2Mb 20ms LL Queue/DropTail Mac/802_3
-
-set tcpsendagent1 [new Agent/TCP]
-set tcpsendagent2 [new Agent/TCP]
-
-set tcprecvagent1 [new Agent/TCPSink]
-set tcprecvagent2 [new Agent/TCPSink]
-
-$ns attach-agent $n1 $tcpsendagent1
-$ns attach-agent $n2 $tcpsendagent2
-
-$ns attach-agent $n6 $tcprecvagent1
-$ns attach-agent $n6 $tcprecvagent2
-
-set app1 [new Application/FTP]
-set app2 [new Application/FTP]
-
-$app1 attach-agent $tcpsendagent1
-$app2 attach-agent $tcpsendagent2
-
-#As soon as you create agents make sure i connect them
-
-$ns connect $tcpsendagent1 $tcprecvagent1
-$ns connect $tcpsendagent2 $tcprecvagent2
-
-$ns at 0.1 "$app1 start"
-$ns at 0.4 "$app2 start"
-
-
-
-
-proc finish { } {
-global ns tr nam
-$ns flush-trace
-close $tr
-close $nam
-exec nam LAN.nam &
-exec gawk -f anal.awk LAN.tr &
-exit 0
-}
-
-$ns at 10 "finish"
-
-$ns run
-
-#anal.awk
-BEGIN{
-drop=0
-recv=0
-starttime1=0
-endtime1=0
-latency1=0
-filesize1=0
-starttime2=0
-endtime2=0
-latency2=0
-filesize2=0
-flag0=0
-flag1=0
-bandwidth1=0
-bandwidth2=0
-}
-
+CLIENT:
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#define SHMSZ 50
+void main()
 {
-
-if($1=="r" && $3==6)
+int shmid;
+key_t key;
+char *shm, *s;
+key = 5678;
+shmid = shmget(key, SHMSZ, 0666);
+shm = (char*)shmat(shmid, NULL, 0);
+for (s = shm; *s != '\0'; s++)
+putchar(*s);
+*shm = '*';
+}
+Ex 2B - Interprocess Communication using Message
+Queue
+SENDER:
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <string.h>
+// structure for message queue
+struct mesg_buffer {
+long mesg_type;
+char mesg_text[100];
+} message;
+int main()
 {
-if(flag1=0)
+key_t key;
+int msgid;
+// ftok to generate unique key
+key = ftok("progfile", 65);
+// msgget creates a message queue
+// and returns identifier
+msgid = msgget(key, 0666 | IPC_CREAT);
+//message.mesg_type = 1;
+printf("Writing Data : ");
+printf("\nEnter the message:");
+scanf("%s",message.mesg_text);
+do
 {
-flag1=1
-starttime1=$2
+printf("\nEnter the type for message:");
+scanf("%ld",&message.mesg_type);
+// msgsnd to send message
+msgsnd(msgid, &message, sizeof(message), 0);
+// display the message
+//printf("Data send is : %s \n", message.mesg_text);
+printf("\nEnter the message:");
+scanf("%s",message.mesg_text);
+}while(strcmp(message.mesg_text,"end")!=0);
+return 0;
 }
-filesize1+=$6
-endtime1=$2
-latency=endtime1-starttime1
-bandwidth1=filesize1/latency
-printf "%f %f\n", endtime1, bandwidth1 >> "file3.xg"
-
+RECEIVER:
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <string.h>
+// structure for message queue
+struct mesg_buffer {
+long mesg_type;
+char mesg_text[100];
+} message;
+int main()
+{
+key_t key;
+int msgid,type;
+char choice[10];
+key = ftok("progfile", 65);
+msgid = msgget(key, 0666 | IPC_CREAT);
+printf("Read Data : ");
+do{
+printf("\nEnter the type of the message: ");
+scanf("%d",&type);
+msgrcv(msgid, &message, sizeof(message),type, 0);
+printf("\nMessage is : %s \n", message.mesg_text);
+printf("Do you want to continue: ");
+scanf("%s",choice);
+}while(strcmp(choice,"no")!=0);
+msgctl(msgid, IPC_RMID, NULL);
+return 0;
 }
-
+ 
+EXP-4(THREAD):
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sched.h>
+ 
+// Thread functions simulating different tasks
+void *threadFunctionA(void *arg) {
+   int priority = *((int *)arg);
+   printf("Thread A running with priority: %d\n", priority);
+   for (int i = 0; i < 5; i++) {
+       printf("Thread A execution: %d\n", i + 1);
+       sleep(1);
+   }
+   pthread_exit(NULL);
 }
-END{
-print("\n\n\n Final Values..")
-print("\n\nfilesize : ",filesize1)
-latency=endtime1-starttime1
-print("\nlatency :",latency)
-bandwidth1=filesize1/latency
-print("\n Throughput (Mbps):",bandwidth1/10^6)
+ 
+void *threadFunctionB(void *arg) {
+   int priority = *((int *)arg);
+   printf("Thread B running with priority: %d\n", priority);
+   for (int i = 0; i < 5; i++) {
+       printf("Thread B execution: %d\n", i + 1);
+       sleep(1);
+   }
+   pthread_exit(NULL);
 }
-
+ 
+void *threadFunctionC(void *arg) {
+   int priority = *((int *)arg);
+   printf("Thread C running with priority: %d\n", priority);
+   for (int i = 0; i < 5; i++) {
+       printf("Thread C execution: %d\n", i + 1);
+       sleep(1);
+   }
+   pthread_exit(NULL);
+}
+ 
+int main() {
+   pthread_t threadA, threadB, threadC;
+   pthread_attr_t attrA, attrB, attrC;
+   struct sched_param paramA, paramB, paramC;
+   int priorityA = 20, priorityB = 10, priorityC = 5;  // Assign priorities to threads
+ 
+   // Initialize attributes for each thread
+   pthread_attr_init(&attrA);
+   pthread_attr_init(&attrB);
+   pthread_attr_init(&attrC);
+ 
+   // Set the scheduling policy for each thread (SCHED_RR for round-robin scheduling)
+   pthread_attr_setschedpolicy(&attrA, SCHED_RR);
+   pthread_attr_setschedpolicy(&attrB, SCHED_RR);
+   pthread_attr_setschedpolicy(&attrC, SCHED_RR);
+ 
+   // Set the priority of each thread
+   paramA.sched_priority = priorityA;
+   paramB.sched_priority = priorityB;
+   paramC.sched_priority = priorityC;
+ 
+   pthread_attr_setschedparam(&attrA, &paramA);
+   pthread_attr_setschedparam(&attrB, &paramB);
+   pthread_attr_setschedparam(&attrC, &paramC);
+ 
+   // Create the threads and associate them with their respective functions
+   pthread_create(&threadA, &attrA, threadFunctionA, &priorityA);
+   pthread_create(&threadB, &attrB, threadFunctionB, &priorityB);
+   pthread_create(&threadC, &attrC, threadFunctionC, &priorityC);
+ 
+   // Wait for all threads to complete
+   pthread_join(threadA, NULL);
+   pthread_join(threadB, NULL);
+   pthread_join(threadC, NULL);
+ 
+   // Destroy thread attributes to free memory
+   pthread_attr_destroy(&attrA);
+   pthread_attr_destroy(&attrB);
+   pthread_attr_destroy(&attrC);
+ 
+   printf("All threads have finished execution.\n");
+ 
+   return 0;
+}
+ 
+exp-5(peterson for n):
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <stdbool.h>
+ 
+#define N 3 // Define the number of processes
+ 
+int turn[N - 1];       // Turn array for hierarchy of decisions
+bool flag[N];          // Flag array to indicate if process wants to enter CS
+ 
+void* process(void* arg) {
+   int i = *(int*)arg;
+   
+   for (int level = 0; level < N - 1; ++level) {
+       flag[i] = true;              // Indicate process wants to enter CS
+       turn[level] = i;             // Set turn at this level to process i
+       
+       // Wait until no other process at this level or higher wants to enter CS
+       while (turn[level] == i && flag[(i + 1) % N]) {
+           // Busy wait
+       }
+   }
+ 
+   // Critical Section
+   printf("Process %d is in the critical section.\n", i);
+   sleep(2); // Simulate work in the critical section
+ 
+   // Exit section
+   flag[i] = false;                 // Indicate process is leaving the critical section
+ 
+   // Remainder section
+   printf("Process %d is in the remainder section.\n", i);
+ 
+   return NULL;
+}
+ 
+int main() {
+   pthread_t threads[N];
+   int ids[N];
+ 
+   // Initialize the ids for each process
+   for (int i = 0; i < N; ++i) {
+       ids[i] = i;
+   }
+ 
+   // Create threads for each process
+   for (int i = 0; i < N; ++i) {
+       pthread_create(&threads[i], NULL, process, &ids[i]);
+   }
+ 
+   // Wait for all threads to finish
+   for (int i = 0; i < N; ++i) {
+       pthread_join(threads[i], NULL);
+   }
+ 
+   return 0;
+}
+ 
+exp-5(peterson for one):
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <stdbool.h>
+ 
+bool flag[2] = {false, false}; // Flags to indicate if a process wants to enter CS
+int turn = 0;                  // Variable to indicate whose turn it is
+ 
+void* process_0() {
+   flag[0] = true;            // P0 wants to enter the critical section
+   turn = 1;                  // Give turn to P1
+   while (flag[1] && turn == 1) {
+       // Wait until P1 finishes its critical section
+   }
+ 
+   // Critical Section of P0
+   printf("Process 0 is in the critical section.\n");
+   sleep(2); // Simulating work in CS
+ 
+   // Exit section
+   flag[0] = false;           // P0 is leaving the critical section
+ 
+   // Remainder section
+   printf("Process 0 is in the remainder section.\n");
+   return NULL;
+}
+ 
+void* process_1() {
+   flag[1] = true;            // P1 wants to enter the critical section
+   turn = 0;                  // Give turn to P0
+   while (flag[0] && turn == 0) {
+       // Wait until P0 finishes its critical section
+   }
+ 
+   // Critical Section of P1
+   printf("Process 1 is in the critical section.\n");
+   sleep(2); // Simulating work in CS
+ 
+   // Exit section
+   flag[1] = false;           // P1 is leaving the critical section
+ 
+   // Remainder section
+   printf("Process 1 is in the remainder section.\n");
+   return NULL;
+}
+ 
+int main() {
+   pthread_t t1, t2;
+ 
+   // Create threads for both processes
+   pthread_create(&t1, NULL, process_0, NULL);
+   pthread_create(&t2, NULL, process_1, NULL);
+ 
+   // Wait for both threads to finish
+   pthread_join(t1, NULL);
+   pthread_join(t2, NULL);
+ 
+   return 0;
+}
+ 
+exp-6(A)(bounded buffer):
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+ 
+#define BUFFER_SIZE 5
+#define NUM_PRODUCERS 2
+#define NUM_CONSUMERS 2
+ 
+int buffer[BUFFER_SIZE];
+int in = 0;
+int out = 0;
+ 
+sem_t empty;
+sem_t full;
+pthread_mutex_t mutex;
+ 
+void* producer(void* arg) {
+   int item;
+   for (int i = 0; i < 10; i++) {
+       item = rand() % 100; // produce an item
+       sem_wait(&empty);     // decrease the count of empty slots
+       pthread_mutex_lock(&mutex); // enter critical section
+       
+       buffer[in] = item;    // insert item into buffer
+       printf("Producer %ld produced %d\n", (long)arg, item);
+       in = (in + 1) % BUFFER_SIZE; // circular buffer
+       
+       pthread_mutex_unlock(&mutex); // exit critical section
+       sem_post(&full);      // increase the count of full slots
+       
+       sleep(rand() % 2); // simulate time taken to produce
+   }
+   return NULL;
+}
+ 
+void* consumer(void* arg) {
+   int item;
+   for (int i = 0; i < 10; i++) {
+       sem_wait(&full);      // decrease the count of full slots
+       pthread_mutex_lock(&mutex); // enter critical section
+       
+       item = buffer[out];   // remove item from buffer
+       printf("Consumer %ld consumed %d\n", (long)arg, item);
+       out = (out + 1) % BUFFER_SIZE; // circular buffer
+       
+       pthread_mutex_unlock(&mutex); // exit critical section
+       sem_post(&empty);     // increase the count of empty slots
+       
+       sleep(rand() % 2); // simulate time taken to consume
+   }
+   return NULL;
+}
+ 
+int main() {
+   pthread_t producers[NUM_PRODUCERS], consumers[NUM_CONSUMERS];
+ 
+   sem_init(&empty, 0, BUFFER_SIZE); // initially all slots are empty
+   sem_init(&full, 0, 0);            // initially no slots are full
+   pthread_mutex_init(&mutex, NULL);
+ 
+   // Create producer threads
+   for (long i = 0; i < NUM_PRODUCERS; i++) {
+       pthread_create(&producers[i], NULL, producer, (void*)i);
+   }
+ 
+   // Create consumer threads
+   for (long i = 0; i < NUM_CONSUMERS; i++) {
+       pthread_create(&consumers[i], NULL, consumer, (void*)i);
+   }
+ 
+   // Wait for all producers to finish
+   for (int i = 0; i < NUM_PRODUCERS; i++) {
+       pthread_join(producers[i], NULL);
+   }
+ 
+   // Wait for all consumers to finish
+   for (int i = 0; i < NUM_CONSUMERS; i++) {
+       pthread_join(consumers[i], NULL);
+   }
+ 
+   sem_destroy(&empty);
+   sem_destroy(&full);
+   pthread_mutex_destroy(&mutex);
+ 
+   return 0;
+}
+ 
+exp-6(A)(unbounded buffer):
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+ 
+typedef struct Node {
+   int data;
+   struct Node* next;
+} Node;
+ 
+Node* head = NULL;
+pthread_mutex_t mutex;
+sem_t empty;
+ 
+void* producer(void* arg) {
+   int item;
+   for (int i = 0; i < 10; i++) {
+       item = rand() % 100; // produce an item
+       
+       pthread_mutex_lock(&mutex); // enter critical section
+       
+       // Add item to linked list (buffer)
+       Node* newNode = (Node*)malloc(sizeof(Node));
+       newNode->data = item;
+       newNode->next = head;
+       head = newNode;
+       
+       printf("Producer %ld produced %d\n", (long)arg, item);
+       
+       pthread_mutex_unlock(&mutex); // exit critical section
+       sem_post(&empty); // signal that there is a new item
+       
+       sleep(rand() % 2); // simulate time taken to produce
+   }
+   return NULL;
+}
+ 
+void* consumer(void* arg) {
+   int item;
+   for (int i = 0; i < 10; i++) {
+       sem_wait(&empty); // wait for an item
+       
+       pthread_mutex_lock(&mutex); // enter critical section
+       
+       // Remove item from linked list (buffer)
+       if (head != NULL) {
+           Node* temp = head;
+           item = head->data;
+           head = head->next;
+           free(temp);
+           printf("Consumer %ld consumed %d\n", (long)arg, item);
+       }
+       
+       pthread_mutex_unlock(&mutex); // exit critical section
+       
+       sleep(rand() % 2); // simulate time taken to consume
+   }
+   return NULL;
+}
+ 
+int main() {
+   pthread_t producers[2], consumers[2];
+ 
+   sem_init(&empty, 0, 0);
+   pthread_mutex_init(&mutex, NULL);
+ 
+   // Create producer threads
+   for (long i = 0; i < 2; i++) {
+       pthread_create(&producers[i], NULL, producer, (void*)i);
+   }
+ 
+   // Create consumer threads
+   for (long i = 0; i < 2; i++) {
+       pthread_create(&consumers[i], NULL, consumer, (void*)i);
+   }
+ 
+   // Wait for all producers to finish
+   for (int i = 0; i < 2; i++) {
+       pthread_join(producers[i], NULL);
+   }
+ 
+   // Wait for all consumers to finish
+   for (int i = 0; i < 2; i++) {
+       pthread_join(consumers[i], NULL);
+   }
+ 
+   // Clean up
+   while (head != NULL) {
+       Node* temp = head;
+       head = head->next;
+       free(temp);
+   }
+   
+   sem_destroy(&empty);
+   pthread_mutex_destroy(&mutex);
+ 
+   return 0;
+}
+ 
+exp-6(B)(reader):
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+ 
+#define NUM_READERS 5
+#define NUM_WRITERS 3
+#define MAX_READS 3
+#define MAX_WRITES 2
+ 
+sem_t read_mutex;     // Mutex for read count
+sem_t resource;       // Semaphore for resource access
+int read_count = 0;   // Number of readers currently reading
+ 
+typedef struct {
+   int id;
+   int read_count;  // Number of reads completed
+} Reader;
+ 
+typedef struct {
+   int id;
+   int write_count; // Number of writes completed
+} Writer;
+ 
+void* reader(void* arg) {
+   Reader* reader_data = (Reader*)arg;
+ 
+   while (reader_data->read_count < MAX_READS) {
+       // Start reading
+       sem_wait(&read_mutex); // Enter critical section for read_count
+       read_count++;
+       if (read_count == 1) {
+           sem_wait(&resource); // First reader locks the resource
+       }
+       sem_post(&read_mutex); // Exit critical section
+ 
+       // Reading section
+       printf("Reader %d is reading.\n", reader_data->id);
+       sleep(rand() % 2); // Simulate reading time
+ 
+       // Done reading
+       sem_wait(&read_mutex); // Enter critical section for read_count
+       read_count--;
+       if (read_count == 0) {
+           sem_post(&resource); // Last reader unlocks the resource
+       }
+       sem_post(&read_mutex); // Exit critical section
+ 
+       reader_data->read_count++; // Increment reads completed
+       sleep(rand() % 2); // Simulate thinking time
+   }
+   printf("Reader %d has finished reading.\n", reader_data->id);
+   free(reader_data);
+   return NULL;
+}
+ 
+void* writer(void* arg) {
+   Writer* writer_data = (Writer*)arg;
+ 
+   while (writer_data->write_count < MAX_WRITES) {
+       // Writing section
+       sem_wait(&resource); // Lock the resource for writing
+       printf("Writer %d is writing.\n", writer_data->id);
+       sleep(rand() % 2); // Simulate writing time
+       sem_post(&resource); // Unlock the resource
+ 
+       writer_data->write_count++; // Increment writes completed
+       sleep(rand() % 2); // Simulate thinking time
+   }
+   printf("Writer %d has finished writing.\n", writer_data->id);
+   free(writer_data);
+   return NULL;
+}
+ 
+int main() {
+   pthread_t readers[NUM_READERS];
+   pthread_t writers[NUM_WRITERS];
+ 
+   // Initialize semaphores
+   sem_init(&read_mutex, 0, 1); // Mutex for reader count
+   sem_init(&resource, 0, 1);    // Semaphore for resource access
+ 
+   // Create reader threads
+   for (int i = 0; i < NUM_READERS; i++) {
+       Reader* r = malloc(sizeof(Reader));
+       r->id = i;
+       r->read_count = 0; // Initialize read count
+       pthread_create(&readers[i], NULL, reader, r);
+   }
+ 
+   // Create writer threads
+   for (int i = 0; i < NUM_WRITERS; i++) {
+       Writer* w = malloc(sizeof(Writer));
+       w->id = i;
+       w->write_count = 0; // Initialize write count
+       pthread_create(&writers[i], NULL, writer, w);
+   }
+ 
+   // Join reader threads
+   for (int i = 0; i < NUM_READERS; i++) {
+       pthread_join(readers[i], NULL);
+   }
+ 
+   // Join writer threads
+   for (int i = 0; i < NUM_WRITERS; i++) {
+       pthread_join(writers[i], NULL);
+   }
+ 
+   // Destroy semaphores
+   sem_destroy(&read_mutex);
+   sem_destroy(&resource);
+ 
+   return 0;
+}
+ 
+exp-6(B)(writer):
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+ 
+#define NUM_READERS 5
+#define NUM_WRITERS 3
+ 
+sem_t mutex;          // For mutual exclusion
+sem_t wrt;            // For writers
+int read_count = 0;   // Number of readers currently reading
+int write_count = 0;  // Number of writers currently waiting
+ 
+void* reader(void* arg) {
+   int id = (int)(long)arg;
+   for (int i = 0; i < 5; i++) {
+       sem_wait(&mutex);          // Start of critical section
+       if (write_count > 0) {
+           sem_post(&mutex);      // If writers are waiting, release mutex
+           continue;              // Skip reading
+       }
+       read_count++;
+       if (read_count == 1) {
+           sem_wait(&wrt);        // First reader locks the writer
+       }
+       sem_post(&mutex);          // End of critical section
+       
+       // Reading section
+       printf("Reader %d is reading\n", id);
+       sleep(1);
+       
+       sem_wait(&mutex);          // Start of critical section
+       read_count--;
+       if (read_count == 0) {
+           sem_post(&wrt);        // Last reader unlocks the writer
+       }
+       sem_post(&mutex);          // End of critical section
+   }
+   return NULL;
+}
+ 
+void* writer(void* arg) {
+   int id = (int)(long)arg;
+   for (int i = 0; i < 5; i++) {
+       sem_wait(&mutex);          // Start of critical section
+       write_count++;             // Increase the count of writers waiting
+       sem_post(&mutex);          // End of critical section
+ 
+       sem_wait(&wrt);            // Writers wait for access
+ 
+       // Writing section
+       printf("Writer %d is writing\n", id);
+       sleep(1);
+       
+       sem_post(&wrt);            // Release the lock
+ 
+       sem_wait(&mutex);          // Start of critical section
+       write_count--;             // Decrease the count of writers waiting
+       sem_post(&mutex);          // End of critical section
+   }
+   return NULL;
+}
+ 
+int main() {
+   pthread_t readers[NUM_READERS], writers[NUM_WRITERS];
+   
+   sem_init(&mutex, 0, 1);       // Initialize mutex
+   sem_init(&wrt, 0, 1);         // Initialize writer semaphore
+ 
+   // Create reader threads
+   for (long i = 0; i < NUM_READERS; i++) {
+       pthread_create(&readers[i], NULL, reader, (void*)i);
+   }
+ 
+   // Create writer threads
+   for (long i = 0; i < NUM_WRITERS; i++) {
+       pthread_create(&writers[i], NULL, writer, (void*)i);
+   }
+ 
+   // Wait for all readers to finish
+   for (int i = 0; i < NUM_READERS; i++) {
+       pthread_join(readers[i], NULL);
+   }
+ 
+   // Wait for all writers to finish
+   for (int i = 0; i < NUM_WRITERS; i++) {
+       pthread_join(writers[i], NULL);
+   }
+ 
+   sem_destroy(&mutex);
+   sem_destroy(&wrt);
+   
+   return 0;
+}
+ 
+exp-7(Bankers):
+#include <stdio.h>
+#include <stdbool.h>
+ 
+#define P 5 // Number of processes
+#define R 3 // Number of resources
+ 
+// Allocation matrix
+int allocation[P][R] = {
+   {0, 1, 0},
+   {2, 0, 0},
+   {3, 0, 2},
+   {2, 1, 1},
+   {0, 0, 2}
+};
+ 
+// Maximum demand matrix
+int max[P][R] = {
+   {7, 5, 3},
+   {3, 2, 2},
+   {9, 0, 2},
+   {2, 2, 2},
+   {4, 3, 3}
+};
+ 
+// Available resources
+int available[R] = {3, 3, 2};
+ 
+// Function to check if a process can finish
+bool canFinish(int process, int work[], bool finish[]) {
+   for (int j = 0; j < R; j++) {
+       if (max[process][j] - allocation[process][j] > work[j]) {
+           return false; // Process cannot finish if it needs more than available resources
+       }
+   }
+   return true;
+}
+ 
+// Function to check if the system is in a safe state
+bool isSafe() {
+   int work[R];
+   bool finish[P] = {false};
+ 
+   // Copy available resources to work
+   for (int i = 0; i < R; i++) {
+       work[i] = available[i];
+   }
+ 
+   int count = 0;
+   while (count < P) {
+       bool found = false;
+       for (int i = 0; i < P; i++) {
+           if (!finish[i] && canFinish(i, work, finish)) {
+               for (int j = 0; j < R; j++) {
+                   work[j] += allocation[i][j]; // Release resources
+               }
+               finish[i] = true; // Mark process as finished
+               found = true;
+               count++;
+               printf("Process P%d can finish. Current work state: {", i);
+               for (int j = 0; j < R; j++) {
+                   printf("%d", work[j]);
+                   if (j != R - 1) printf(", ");
+               }
+               printf("}\n");
+           }
+       }
+       if (!found) {
+           return false; // Not in a safe state
+       }
+   }
+   return true; // Safe state
+}
+ 
+// Function to request resources
+bool requestResources(int processNum, int request[]) {
+   // Check if request exceeds maximum claim
+   for (int j = 0; j < R; j++) {
+       if (request[j] > max[processNum][j] - allocation[processNum][j]) {
+           printf("Error: Process P%d exceeded its maximum claim.\n", processNum);
+           return false; // Request exceeds maximum claim
+       }
+   }
+ 
+   // Check if request can be satisfied
+   for (int j = 0; j < R; j++) {
+       if (request[j] > available[j]) {
+           printf("Process P%d must wait; resources not available.\n", processNum);
+           return false; // Not enough resources available
+       }
+   }
+ 
+   // Pretend to allocate the requested resources
+   printf("Allocating resources to Process P%d. Request: {", processNum);
+   for (int j = 0; j < R; j++) {
+       printf("%d", request[j]);
+       if (j != R - 1) printf(", ");
+   }
+   printf("}\n");
+ 
+   for (int j = 0; j < R; j++) {
+       available[j] -= request[j];
+       allocation[processNum][j] += request[j];
+   }
+ 
+   // Check if the system is in a safe state after allocation
+   if (isSafe()) {
+       printf("Resources allocated to Process P%d safely.\n", processNum);
+       return true; // Request can be granted
+   } else {
+       // Rollback the allocation if not safe
+       for (int j = 0; j < R; j++) {
+           available[j] += request[j];
+           allocation[processNum][j] -= request[j];
+       }
+       printf("Resources cannot be allocated to Process P%d; system would be unsafe.\n", processNum);
+       return false; // Request cannot be granted
+   }
+}
+ 
+int main() {
+   // Example requests
+   int request1[R] = {1, 0, 2}; // Request from process P1
+   requestResources(1, request1); // Attempt to request resources for process P1
+ 
+   int request4[R] = {3, 3, 0}; // Request from process P4
+   requestResources(4, request4); // Attempt to request resources for process P4
+ 
+   int request2[R] = {0, 0, 0}; // Modified request from process P2 (valid)
+   requestResources(2, request2); // Attempt to request resources for process P2
+ 
+   return 0;
+}
+ 
+exp-8(deadlock detection):
+#include <stdio.h>
+#include <stdbool.h>
+ 
+#define P 5 // Number of processes
+#define R 3 // Number of resources
+ 
+// Allocation matrix
+int allocation[P][R] = {
+   {0, 1, 0},
+   {2, 0, 0},
+   {3, 0, 2},
+   {2, 1, 1},
+   {0, 0, 2}
+};
+ 
+// Request matrix
+int max[P][R] = {
+   {7, 5, 3},
+   {3, 2, 2},
+   {9, 0, 2},
+   {2, 2, 2},
+   {4, 3, 3}
+};
+ 
+// Available resources
+int available[R] = {3, 3, 2};
+ 
+// Function to print the current finish state
+void printFinishState(bool finish[]) {
+   printf("Finish state: ");
+   for (int i = 0; i < P; i++) {
+       printf("P%d: %s ", i, finish[i] ? "true" : "false");
+   }
+   printf("\n");
+}
+ 
+// Function to check if the system is in a deadlock state
+bool detectDeadlock() {
+   int work[R];
+   bool finish[P] = {false};
+ 
+   // Initialize work with available resources
+   for (int i = 0; i < R; i++) {
+       work[i] = available[i];
+   }
+ 
+   int count = 0; // To track finished processes
+ 
+   while (count < P) {
+       bool found = false; // Flag to check if any process can finish
+ 
+       for (int i = 0; i < P; i++) {
+           // Check if process is not finished and if its request can be satisfied
+           if (!finish[i]) {
+               // Calculate remaining need for the process
+               int need[R];
+               for (int j = 0; j < R; j++) {
+                   need[j] = max[i][j] - allocation[i][j];
+               }
+ 
+               // Check if the request can be satisfied
+               bool canFinish = true;
+               for (int j = 0; j < R; j++) {
+                   if (need[j] > work[j]) {
+                       canFinish = false; // Request cannot be satisfied
+                       break;
+                   }
+               }
+ 
+               // If it can finish, simulate resource allocation
+               if (canFinish) {
+                   for (int j = 0; j < R; j++) {
+                       work[j] += allocation[i][j]; // Release allocated resources
+                   }
+                   finish[i] = true; // Mark process as finished
+                   found = true; // A process has been found that can finish
+                   count++; // Increment count of finished processes
+                   printf("Process P%d is finished.\n", i);
+                   printFinishState(finish);
+               }
+           }
+       }
+ 
+       // If no process can finish, we have a deadlock
+       if (!found) {
+           printf("No suitable process found, system is in deadlock state.\n");
+           for (int i = 0; i < P; i++) {
+               if (!finish[i]) {
+                   printf("Process P%d is deadlocked.\n", i);
+               }
+           }
+           return true; // Deadlock detected
+       }
+   }
+ 
+   printf("All processes can finish, no deadlock.\n");
+   return false; // No deadlock
+}
+ 
+int main() {
+   if (!detectDeadlock()) {
+       printf("Safe state detected. No deadlock present.\n");
+   } else {
+       printf("Deadlock detected! Taking recovery actions...\n");
+       // Implement recovery actions here if necessary
+   }
+ 
+   return 0;
+}
+ 
+exp-9(Dining Philosophers):
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+ 
+#define NUM_PHILOSOPHERS 5
+#define MAX_MEALS 3 // Maximum meals each philosopher can eat
+ 
+sem_t chopsticks[NUM_PHILOSOPHERS]; // Semaphores representing chopsticks
+ 
+void* philosopher(void* num) {
+   int id = *((int*)num);
+   free(num);
+   int meals_eaten = 0;
+ 
+   while (meals_eaten < MAX_MEALS) {
+       printf("Philosopher %d is thinking.\n", id);
+       sleep(rand() % 3); // Thinking time
+ 
+       // Pick up chopsticks
+       sem_wait(&chopsticks[id]); // Pick up left chopstick
+       sem_wait(&chopsticks[(id + 1) % NUM_PHILOSOPHERS]); // Pick up right chopstick
+ 
+       // Eating
+       printf("Philosopher %d is eating (%d meal).\n", id, meals_eaten + 1);
+       sleep(rand() % 3); // Eating time
+       meals_eaten++;
+ 
+       // Put down chopsticks
+       sem_post(&chopsticks[id]); // Put down left chopstick
+       sem_post(&chopsticks[(id + 1) % NUM_PHILOSOPHERS]); // Put down right chopstick
+   }
+ 
+   printf("Philosopher %d has finished eating and is leaving the table.\n", id);
+   return NULL;
+}
+ 
+int main() {
+   pthread_t philosophers[NUM_PHILOSOPHERS];
+ 
+   // Initialize semaphores
+   for (int i = 0; i < NUM_PHILOSOPHERS; i++) {
+       sem_init(&chopsticks[i], 0, 1); // Each chopstick is available
+   }
+ 
+   // Create philosopher threads
+   for (int i = 0; i < NUM_PHILOSOPHERS; i++) {
+       int* num = malloc(sizeof(int)); // Allocate memory for philosopher id
+       *num = i;
+       pthread_create(&philosophers[i], NULL, philosopher, num);
+   }
+ 
+   // Join philosopher threads
+   for (int i = 0; i < NUM_PHILOSOPHERS; i++) {
+       pthread_join(philosophers[i], NULL);
+   }
+ 
+   // Destroy semaphores
+   for (int i = 0; i < NUM_PHILOSOPHERS; i++) {
+       sem_destroy(&chopsticks[i]);
+   }
+ 
+   return 0;
+}
+ 
+exp-10(Dining Philosophers without deadlock):
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+#include <stdbool.h>
+ 
+#define NUM_PHILOSOPHERS 5
+ 
+// Declare semaphores and mutex
+sem_t chopsticks[NUM_PHILOSOPHERS];
+pthread_mutex_t mutex;
+bool hungry[NUM_PHILOSOPHERS] = {false};  // Keep track of which philosopher is hungry
+bool exit_flag = false;  // Global flag to stop the philosophers
+ 
+void think(int philosopher) {
+   printf("Philosopher %d is thinking.\n", philosopher);
+   sleep(rand() % 3 + 1);  // Simulate thinking time
+}
+ 
+void eat(int philosopher) {
+   printf("Philosopher %d is eating.\n", philosopher);
+   sleep(rand() % 3 + 1);  // Simulate eating time
+}
+ 
+void pick_up_chopsticks(int philosopher) {
+   pthread_mutex_lock(&mutex);  // Ensure mutual exclusion
+   
+   // Pick up the left and right chopsticks
+   sem_wait(&chopsticks[philosopher]);  // Wait for the left chopstick
+   sem_wait(&chopsticks[(philosopher + 1) % NUM_PHILOSOPHERS]);  // Wait for the right chopstick
+   
+   printf("Philosopher %d picked up chopsticks %d and %d.\n", philosopher, philosopher, (philosopher + 1) % NUM_PHILOSOPHERS);
+   
+   pthread_mutex_unlock(&mutex);
+}
+ 
+void put_down_chopsticks(int philosopher) {
+   // Put down both chopsticks
+   sem_post(&chopsticks[philosopher]);  // Release the left chopstick
+   sem_post(&chopsticks[(philosopher + 1) % NUM_PHILOSOPHERS]);  // Release the right chopstick
+   
+   printf("Philosopher %d put down chopsticks %d and %d.\n", philosopher, philosopher, (philosopher + 1) % NUM_PHILOSOPHERS);
+}
+ 
+void* philosopher_routine(void* arg) {
+   int philosopher = *(int*)arg;
+   free(arg);
+   
+   while (!exit_flag) {
+       think(philosopher);
+       pick_up_chopsticks(philosopher);
+       eat(philosopher);
+       put_down_chopsticks(philosopher);
+   }
+   
+   printf("Philosopher %d is exiting.\n", philosopher);
+   return NULL;
+}
+ 
+void dining_philosophers(int choice) {
+   pthread_t philosophers[NUM_PHILOSOPHERS];
+   int* id;
+   
+   // Initialize chopstick semaphores and mutex
+   for (int i = 0; i < NUM_PHILOSOPHERS; ++i) {
+       sem_init(&chopsticks[i], 0, 1);  // Initialize each chopstick semaphore to 1
+   }
+   pthread_mutex_init(&mutex, NULL);
+   
+   // Create philosopher threads
+   for (int i = 0; i < NUM_PHILOSOPHERS; ++i) {
+       id = malloc(sizeof(int));
+       *id = i;
+       pthread_create(&philosophers[i], NULL, philosopher_routine, id);
+   }
+ 
+   // Simulate the philosopher activity based on user choice
+   if (choice == 1) {
+       printf("Only one philosopher can eat at a time.\n");
+   } else if (choice == 2) {
+       printf("Up to two philosophers can eat at the same time.\n");
+   }
+ 
+   // Wait for user to signal exit
+   printf("Press Enter to stop the simulation...\n");
+   getchar();
+   getchar();  // Wait for user to press Enter
+ 
+   // Set exit flag and wait for all threads to finish
+   exit_flag = true;
+   for (int i = 0; i < NUM_PHILOSOPHERS; ++i) {
+       pthread_join(philosophers[i], NULL);
+   }
+   
+   // Cleanup resources
+   for (int i = 0; i < NUM_PHILOSOPHERS; ++i) {
+       sem_destroy(&chopsticks[i]);
+   }
+   pthread_mutex_destroy(&mutex);
+}
+ 
+int main() {
+   int choice;
+   
+   while (1) {
+       printf("\nDINING PHILOSOPHER PROBLEM\n");
+       printf("1. Allow one philosopher to eat at a time\n");
+       printf("2. Allow two philosophers to eat at a time\n");
+       printf("3. Exit\n");
+       printf("Enter your choice: ");
+       scanf("%d", &choice);
+       
+       switch (choice) {
+           case 1:
+           case 2:
+               dining_philosophers(choice);
+               break;
+           case 3:
+               exit(0);
+           default:
+               printf("Invalid choice. Please try again.\n");
+       }
+   }
+   
+   return 0;
+}
+ 
+ 
+EXP-12(disk scheduling):
+#include <stdio.h>
+#include <stdlib.h>
+ 
+void FCFS(int request[], int n, int head) {
+   int total_seek = 0;
+   printf("FCFS Disk Scheduling\n");
+   for (int i = 0; i < n; i++) {
+       printf("Disk head moves from %d to %d with seek %d\n", head, request[i], abs(request[i] - head));
+       total_seek += abs(request[i] - head);
+       head = request[i];
+   }
+   printf("Total seek time is %d\n", total_seek);
+   printf("Average seek time is %.2f\n", (float)total_seek / n);
+}
+ 
+void SSTF(int request[], int n, int head) {
+   int total_seek = 0, completed[n], min_index, seek;
+   for (int i = 0; i < n; i++) completed[i] = 0;
+ 
+   printf("\nSSTF Disk Scheduling\n");
+   for (int i = 0; i < n; i++) {
+       min_index = -1;
+       for (int j = 0; j < n; j++) {
+           if (!completed[j] && (min_index == -1 || abs(request[j] - head) < abs(request[min_index] - head))) {
+               min_index = j;
+           }
+       }
+       seek = abs(request[min_index] - head);
+       printf("Disk head moves from %d to %d with seek %d\n", head, request[min_index], seek);
+       total_seek += seek;
+       head = request[min_index];
+       completed[min_index] = 1;
+   }
+   printf("Total seek time is %d\n", total_seek);
+   printf("Average seek time is %.2f\n", (float)total_seek / n);
+}
+ 
+void SCAN(int request[], int n, int head, int max_range) {
+   int total_seek = 0;
+   int i, j, seek, pos, direction = 1; // direction = 1 for right, -1 for left
+ 
+   // Sort the requests array in ascending order
+   for (i = 0; i < n - 1; i++) {
+       for (j = i + 1; j < n; j++) {
+           if (request[i] > request[j]) {
+               int temp = request[i];
+               request[i] = request[j];
+               request[j] = temp;
+           }
+       }
+   }
+ 
+   // Find the starting position in sorted request where the head is currently located
+   for (i = 0; i < n; i++) {
+       if (request[i] >= head) {
+           pos = i; // Index where the head should start servicing requests
+           break;
+       }
+   }
+ 
+   printf("\nSCAN Disk Scheduling\n");
+ 
+   // Move towards the right (higher numbered cylinders)
+   for (i = pos; i < n; i++) {
+       printf("Disk head moves from %d to %d with seek %d\n", head, request[i], abs(request[i] - head));
+       seek = abs(request[i] - head);
+       total_seek += seek;
+       head = request[i];
+   }
+ 
+   // After reaching the end, move to the maximum range
+   if (head < max_range - 1) {
+       printf("Disk head moves from %d to %d with seek %d\n", head, max_range - 1, abs(max_range - 1 - head));
+       seek = abs(max_range - 1 - head);
+       total_seek += seek;
+       head = max_range - 1;
+   }
+ 
+   // Move towards the left (lower numbered cylinders)
+   for (i = pos - 1; i >= 0; i--) {
+       printf("Disk head moves from %d to %d with seek %d\n", head, request[i], abs(request[i] - head));
+       seek = abs(request[i] - head);
+       total_seek += seek;
+       head = request[i];
+   }
+ 
+   printf("Total seek time is %d\n", total_seek);
+   printf("Average seek time is %.2f\n", (float)total_seek / n);
+}
+ 
+ 
+void CLOOK(int request[], int n, int head) {
+   int total_seek = 0;
+   printf("\nC-LOOK Disk Scheduling\n");
+ 
+   for (int i = 0; i < n; i++) {
+       if (request[i] >= head) {
+           printf("Disk head moves from %d to %d with seek %d\n", head, request[i], abs(request[i] - head));
+           total_seek += abs(request[i] - head);
+           head = request[i];
+       }
+   }
+   for (int i = 0; i < n; i++) {
+       if (request[i] < head) {
+           printf("Disk head moves from %d to %d with seek %d\n", head, request[i], abs(request[i] - head));
+           total_seek += abs(request[i] - head);
+           head = request[i];
+       }
+   }
+ 
+   printf("Total seek time is %d\n", total_seek);
+   printf("Average seek time is %.2f\n", (float)total_seek / n);
+}
+ 
+int main() {
+   int max_range, size, head;
+   
+   printf("Enter the max range of disk: ");
+   scanf("%d", &max_range);
+   
+   printf("Enter the size of queue request: ");
+   scanf("%d", &size);
+   
+   int request[size];
+   printf("Enter the queue of disk positions to be read: ");
+   for (int i = 0; i < size; i++) {
+       scanf("%d", &request[i]);
+   }
+   
+   printf("Enter the initial head position: ");
+   scanf("%d", &head);
+ 
+   // Running all algorithms
+   FCFS(request, size, head);
+   SSTF(request, size, head);
+   SCAN(request, size, head, max_range);
+   CLOOK(request, size, head);
+ 
+   return 0;
+}
+ 
+ 
+EXP-11(B)(TLB):
+#include <stdio.h>
+ 
+int main() {
+   int mem_size, page_size, num_pages, num_processes;
+   
+   // Input the memory and paging details
+   printf("Enter the memory size: ");
+   scanf("%d", &mem_size);
+   
+   printf("Enter the page size: ");
+   scanf("%d", &page_size);
+   
+   num_pages = mem_size / page_size;
+   printf("The number of pages available in memory are %d\n", num_pages);
+   
+   printf("Enter the number of processes: ");
+   scanf("%d", &num_processes);
+ 
+   int process_pages[num_processes], page_tables[num_processes][num_pages];
+ 
+   // Input the page table for each process
+   for (int i = 0; i < num_processes; i++) {
+       printf("Enter number of pages required for process p[%d]: ", i + 1);
+       scanf("%d", &process_pages[i]);
+       
+       if (process_pages[i] > num_pages) {
+           printf("Memory is Full\n");
+           return 1;
+       }
+       
+       printf("Enter page table for process p[%d]: ", i + 1);
+       for (int j = 0; j < process_pages[i]; j++) {
+           scanf("%d", &page_tables[i][j]);
+       }
+   }
+ 
+   // Input for logical address to find physical address
+   int process_num, page_num, offset;
+   printf("Enter Logical Address to find Physical Address\n");
+   printf("Enter process number, page number and offset: ");
+   scanf("%d %d %d", &process_num, &page_num, &offset);
+ 
+   // Check if the process number and page number are valid
+   if (process_num > num_processes || process_num < 1) {
+       printf("Invalid process number.\n");
+       return 1;
+   }
+   
+   if (page_num >= process_pages[process_num - 1]) {
+       printf("Invalid page number for process p[%d].\n", process_num);
+       return 1;
+   }
+   
+   if (offset >= page_size) {
+       printf("Invalid offset. It should be less than the page size.\n");
+       return 1;
+   }
+ 
+   // Calculate the physical address
+   int frame_num = page_tables[process_num - 1][page_num];  // Get the frame number from the page table
+   int physical_address = frame_num * page_size + offset;
+ 
+   // Output the physical address
+   printf("The Physical Address is: %d\n", physical_address);
+   
+   return 0;
+}
+ 
+ 
+EXP-11(A)(PAGE REPLACEMENT):
+#include <stdio.h>
+ 
+void FIFO(int pages[], int n, int no_of_frames) {
+   int frames[no_of_frames], page_faults = 0, index = 0;
+   printf("\nFIFO Page Replacement\n");
+ 
+   for (int i = 0; i < no_of_frames; i++) frames[i] = -1;  // Initialize frames
+ 
+   for (int i = 0; i < n; i++) {
+       int flag = 0;
+ 
+       // Check if page is already in frame
+       for (int j = 0; j < no_of_frames; j++) {
+           if (frames[j] == pages[i]) {
+               flag = 1;  // Page hit
+               break;
+           }
+       }
+ 
+       if (!flag) {  // Page fault
+           frames[index] = pages[i];
+           index = (index + 1) % no_of_frames;  // Circular queue
+           page_faults++;
+           printf("Page %d caused a page fault.\n", pages[i]);
+       }
+   }
+ 
+   printf("Total Page Faults: %d\n", page_faults);
+}
+ 
+void LRU(int pages[], int n, int no_of_frames) {
+   int frames[no_of_frames], time[no_of_frames], page_faults = 0;
+ 
+   printf("\nLRU Page Replacement\n");
+   for (int i = 0; i < no_of_frames; i++) {
+       frames[i] = -1;  // Initialize frames
+       time[i] = -1;    // Time tracking for LRU
+   }
+ 
+   for (int i = 0; i < n; i++) {
+       int flag = 0, least_recent = 0;
+ 
+       // Check if page is already in frame
+       for (int j = 0; j < no_of_frames; j++) {
+           if (frames[j] == pages[i]) {
+               flag = 1;
+               time[j] = i;  // Update time for the page hit
+               break;
+           }
+       }
+ 
+       if (!flag) {  // Page fault
+           // Find the least recently used page
+           for (int j = 0; j < no_of_frames; j++) {
+               if (time[j] < time[least_recent]) least_recent = j;
+           }
+ 
+           frames[least_recent] = pages[i];  // Replace page
+           time[least_recent] = i;  // Update time of replacement
+           page_faults++;
+           printf("Page %d caused a page fault.\n", pages[i]);
+       }
+   }
+ 
+   printf("Total Page Faults: %d\n", page_faults);
+}
+ 
+void Optimal(int pages[], int n, int no_of_frames) {
+   int frames[no_of_frames], page_faults = 0;
+ 
+   printf("\nOptimal Page Replacement\n");
+   for (int i = 0; i < no_of_frames; i++) frames[i] = -1;  // Initialize frames
+ 
+   for (int i = 0; i < n; i++) {
+       int flag = 0;
+ 
+       // Check if page is already in frame
+       for (int j = 0; j < no_of_frames; j++) {
+           if (frames[j] == pages[i]) {
+               flag = 1;  // Page hit
+               break;
+           }
+       }
+ 
+       if (!flag) {  // Page fault
+           int replace_index = -1, farthest = i + 1;
+ 
+           // Find the page that won't be used for the longest time in future
+           for (int j = 0; j < no_of_frames; j++) {
+               int k;
+               for (k = i + 1; k < n; k++) {
+                   if (frames[j] == pages[k]) {
+                       if (k > farthest) {
+                           farthest = k;
+                           replace_index = j;
+                       }
+                       break;
+                   }
+               }
+ 
+               // If page is not found in future, replace it
+               if (k == n) {
+                   replace_index = j;
+                   break;
+               }
+           }
+ 
+           if (replace_index == -1) {
+               for (int j = 0; j < no_of_frames; j++) {
+                   if (frames[j] == -1) {
+                       replace_index = j;
+                       break;
+                   }
+               }
+           }
+ 
+           frames[replace_index] = pages[i];  // Replace page
+           page_faults++;
+           printf("Page %d caused a page fault.\n", pages[i]);
+       }
+   }
+ 
+   printf("Total Page Faults: %d\n", page_faults);
+}
+ 
+int main() {
+   int no_of_frames = 3;  // You can change the number of frames as needed
+   int pages[] = {2, -1, -1, 2, 3, -1, 2, 3, -1, 2, 3, 1, 5, 3, 1, 3, 2, 4, 3, 2, 4, 3, 5, 4, 3, 5, 2};
+   int no_of_pages = sizeof(pages) / sizeof(pages[0]);
+ 
+   printf("Number of frames: %d\n", no_of_frames);
+   printf("Page sequence: ");
+   for (int i = 0; i < no_of_pages; i++) {
+       if (pages[i] != -1) {
+           printf("%d ", pages[i]);
+       }
+   }
+   printf("\n");
+ 
+   FIFO(pages, no_of_pages, no_of_frames);
+   LRU(pages, no_of_pages, no_of_frames);
+   Optimal(pages, no_of_pages, no_of_frames);
+ 
+   return 0;
+}
