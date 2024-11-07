@@ -384,60 +384,56 @@ return 0;
  
 Ex 2A - Interprocess Communication using Shared
 Memory
-SERVER:
-#include<stdio.h>
-#include<sys/types.h>
-#include<sys/ipc.h>
-#include<sys/shm.h>
-#include<unistd.h>
-#include<string.h>
-#define SHMSZ 50
-void main()
-{
-char c;
-int shmid;
-key_t key;
-char*shm,*s;
-key=5678; // A random number used as key
-shmid=shmget(key,SHMSZ,IPC_CREAT|0666); // Create shared
-//memory
-shm=(char*)shmat(shmid,NULL,0); //Attach shared memory
-s=shm; // Temporary pointer to avoid moving shm from base address of
-//shared memory
-printf("Enter the message you want to send: ");
-scanf("%s", s); // Message copied into Shared memory directly through
-//spointer
-while(*shm!='*') // Sender waits until received acknowledge it has read
-//by appending * into shared memory
-sleep(1);
-}
-CLIENT:
-#include <stdio.h>
-#include <sys/types.h>
+#include <iostream>
 #include <sys/ipc.h>
 #include <sys/shm.h>
-#define SHMSZ 50
-void main()
-{
-int shmid;
-key_t key;
-char *shm, *s;
-key = 5678;
-shmid = shmget(key, SHMSZ, 0666);
-shm = (char*)shmat(shmid, NULL, 0);
-for (s = shm; *s != '\0'; s++)
-putchar(*s);
-*shm = '*';
+#include <stdio.h>
+using namespace std;
+int main()
+{ // ftok to generate unique key
+key_t key = ftok("shmfile",65);
+// shmget creates shared memory and returns an identifier in shmid
+int shmid = shmget(key,1024,0666|IPC_CREAT);
+// shmat to attach to shared memory
+char *str = (char*) shmat(shmid,(void*)0,0);
+cout<<"Write Data : ";
+gets(str);
+printf("Data written in memory: %s\n",str);
+//detach from shared memory
+shmdt(str);
+return 0;
 }
+shm_client.c
+#include <iostream>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <stdio.h>
+using namespace std;
+int main()
+{
+// ftok to generate same key of the server
+key_t key = ftok("shmfile",65);
+// shmget returns an identifier in shmid
+int shmid = shmget(key,1024,0666|IPC_CREAT);
+// shmat to attach to shared memory
+char *str = (char*) shmat(shmid,(void*)0,0);
+printf("Data read from memory: %s\n",str);
+//detach from shared memory
+shmdt(str);
+// destroy the shared memory
+shmctl(shmid,IPC_RMID,NULL);
+return 0;
+}
+
 Ex 2B - Interprocess Communication using Message
 Queue
-SENDER:
+// Program for Message Queue (Sender Process)
 #include <stdio.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
-#include <string.h>
 // structure for message queue
-struct mesg_buffer {
+struct msg_queue
+{
 long mesg_type;
 char mesg_text[100];
 } message;
@@ -447,54 +443,41 @@ key_t key;
 int msgid;
 // ftok to generate unique key
 key = ftok("progfile", 65);
-// msgget creates a message queue
-// and returns identifier
+
+// msgget creates a message queue and returns identifier
 msgid = msgget(key, 0666 | IPC_CREAT);
-//message.mesg_type = 1;
-printf("Writing Data : ");
-printf("\nEnter the message:");
-scanf("%s",message.mesg_text);
-do
-{
-printf("\nEnter the type for message:");
-scanf("%ld",&message.mesg_type);
+printf(“Enter the message type:”);
+scanf(“%d”,&message.mesg_type);
+printf(“Enter the message:”);
+gets(message.mesg_text);
 // msgsnd to send message
 msgsnd(msgid, &message, sizeof(message), 0);
-// display the message
-//printf("Data send is : %s \n", message.mesg_text);
-printf("\nEnter the message:");
-scanf("%s",message.mesg_text);
-}while(strcmp(message.mesg_text,"end")!=0);
+printf("Data sent successfully”);
 return 0;
 }
-RECEIVER:
+//Sample message and type: Nokia 1
+// Program for Message Queue (Receiver Process)
 #include <stdio.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
-#include <string.h>
-// structure for message queue
-struct mesg_buffer {
-long mesg_type;
+struct msg_queue
+{
+long type;
 char mesg_text[100];
-} message;
+}message;
+long int x;
+int i=1;
 int main()
 {
 key_t key;
-int msgid,type;
-char choice[10];
+int msgid;
+// ftok to generate the same key as the sender
 key = ftok("progfile", 65);
 msgid = msgget(key, 0666 | IPC_CREAT);
-printf("Read Data : ");
-do{
-printf("\nEnter the type of the message: ");
-scanf("%d",&type);
-msgrcv(msgid, &message, sizeof(message),type, 0);
-printf("\nMessage is : %s \n", message.mesg_text);
-printf("Do you want to continue: ");
-scanf("%s",choice);
-}while(strcmp(choice,"no")!=0);
-msgctl(msgid, IPC_RMID, NULL);
-return 0;
+printf("Enter the type:");
+scanf("%ld",&buf.type);
+msgrcv(msgqid, &message, sizeof(message.mesg_text),message.type, 0);
+printf("Message associated with type %d is %s",buf.type, message.mesg_text);
 }
  
 EXP-4(THREAD):
