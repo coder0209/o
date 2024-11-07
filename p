@@ -274,3 +274,93 @@ int main() {
  
    return 0;
 }
+--------------------------------------------------------------------------------------------------
+//parent and child using shared memory
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>    // For fork() and sleep()
+#include <sys/ipc.h>   // For IPC_CREAT
+#include <sys/shm.h>   // For shmget, shmat, shmdt, shmctl
+#include <string.h>    // For strcpy and strlen
+#include <sys/wait.h>  // For wait()
+
+int main() {
+    // Generate a unique key for the shared memory segment
+    key_t key = ftok("shmfile", 65);
+
+    // Create a shared memory segment
+    int shmid = shmget(key, 1024, 0666 | IPC_CREAT);
+
+    // Fork the process to create parent and child
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        // Fork failed
+        perror("fork failed");
+        return 1;
+    } else if (pid > 0) {
+        // Parent process
+       char *str = (char *)shmat(shmid, NULL, 0);
+       printf("Parent: Write Data: ");
+        scanf("%s",&str);
+        // Detach from shared memory
+        shmdt(str);
+
+        // Wait for the child to complete
+        wait(NULL);
+
+        // Destroy the shared memory after child has finished reading
+        shmctl(shmid, IPC_RMID, NULL);
+    } else {
+        // Child process
+        sleep(3); // Sleep to ensure parent writes first
+
+        char *str = (char *)shmat(shmid, NULL, 0);
+        printf("Child: Data read from memory: %s\n", str);
+
+        // Detach from shared memory
+        shmdt(str);
+    }
+
+    return 0;
+}
+-------------------------------------------------------------------------------------------------
+//bidirectional pipe
+#include<stdio.h>
+#include<unistd.h>
+#include<sys/types.h>
+#include<sys/wait.h>
+#include<string.h>
+int main()
+{
+    int fd1[2],fd2[2];
+    pid_t p1;
+    pipe(fd1);
+    pipe(fd2);
+    p1=fork();
+    char a[10],b[10];
+    if(p1==0)
+    {
+       read(fd1[0],a,strlen(a)+1);
+        close(fd1[0]);
+        printf("Data read from parent: %s\n", a);
+        
+        
+        printf("enter string in child:");
+        scanf("%s",b);
+        
+        write(fd2[1],b,strlen(b)+1);
+        close(fd2[1]);
+    }
+    else
+    {
+        printf("enter string in parent :");
+        scanf("%s",a);
+        write(fd1[1],a,strlen(a)+1);
+        close(fd1[1]);
+        wait(NULL);
+        read(fd2[0],b,strlen(b)+1);
+        printf("Data read from child: %s\n", b);
+    }
+}
+
