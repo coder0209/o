@@ -1,347 +1,321 @@
 1.FCFS:
-#include<stdio.h>   // Including standard input-output header file
-#include<stdlib.h>  // Including standard library header file (not used in this program)
- 
-// Defining a structure to represent each process
-struct node {
-   int arr;   // Arrival time of the process
-   int ct;    // Completion time of the process
-   int bur;   // Burst time (execution time) of the process
-};
- 
-int main() {
-   struct node obj[100];  // Array to store up to 100 processes
-   int n, i, j;           // Declaring variables for loop control and number of processes
- 
-   // Asking the user to input the number of processes
-   printf("Enter the number of processes\n");
-   scanf("%d", &n);  // Storing the number of processes in variable 'n'
- 
-   // Loop to input the arrival time and burst time for each process
-   for(i = 0; i < n; i++) {
-       printf("Enter the arrival time of process %d\n", i+1);
-       scanf("%d", &obj[i].arr);  // Input arrival time for the process
- 
-       printf("Enter the burst time of process %d\n", i+1);
-       scanf("%d", &obj[i].bur);  // Input burst time for the process
- 
-       obj[i].ct = 0;  // Initializing the completion time to 0
-   }
- 
-   // Sorting processes based on their arrival time using bubble sort
-   struct node temp;  // Temporary variable for swapping processes
-   for(i = 0; i < n-1; i++) {
-       for(j = i + 1; j < n; j++) {
-           if(obj[i].arr > obj[j].arr) {  // If the current process arrives later than the next process
-               temp = obj[j];  // Swap the processes
-               obj[j] = obj[i];
-               obj[i] = temp;
-           }
-       }
-   }
- 
-   // Declaring arrays to store waiting time and turnaround time for each process
-   int wt[n];   // Array for waiting time
-   int tat[n];  // Array for turnaround time
- 
-   // Calculating the completion time, turnaround time, and waiting time for the first process
-   obj[0].ct = obj[0].arr + obj[0].bur;  // Completion time for the first process
-   tat[0] = obj[0].ct - obj[0].arr;      // Turnaround time = Completion time - Arrival time
-   wt[0] = tat[0] - obj[0].bur;          // Waiting time = Turnaround time - Burst time
- 
-   // Loop to calculate the same for all remaining processes
-   for(i = 1; i < n; i++) {
-       obj[i].ct = obj[i-1].ct + obj[i].bur;  // Completion time = Previous process's completion time + current burst time
-       tat[i] = obj[i].ct - obj[i].arr;       // Turnaround time = Completion time - Arrival time
-       wt[i] = tat[i] - obj[i].bur;           // Waiting time = Turnaround time - Burst time
-   }
- 
-   // Printing the results in a tabular format
-   printf("AT\tBT\tCT\tWT\tTAT\n");  // Header for the table
-   for(i = 0; i < n; i++) {
-       printf("%d\t%d\t%d\t%d\t%d\n", obj[i].arr, obj[i].bur, obj[i].ct, wt[i], tat[i]);
-       // Print Arrival Time, Burst Time, Completion Time, Waiting Time, and Turnaround Time for each process
-   }
- 
-   return 0;  // End of the program, returning 0 indicates successful execution
-}
- 
+#include <stdio.h>
 
-2.Round Robin:
-#include<stdio.h>   // Including standard input-output header file
- 
-// Defining a structure to represent each process
 struct process {
-   int at;  // Arrival time of the process
-   int bt;  // Burst time (execution time) of the process
-   int rt;  // Remaining time of the process
-   int ft;  // Finish time (completion time) of the process
-   int wt;  // Waiting time of the process
-   int tat; // Turnaround time of the process
-   int status; // Status to indicate if the process is completed
-} p[10];     // Array of processes, assuming a maximum of 10 processes
- 
-int n, time_quantum;  // Variables to store the number of processes and the time quantum
- 
-// Function prototype for the dispatcher function
-void dispatcher();
- 
+    int at;     // Arrival Time
+    int bt;     // Burst Time
+    int id;     // Process ID
+    int ct;     // Completion Time
+    int tat;    // Turnaround Time
+    int wt;     // Waiting Time
+};
+
+void fcfs(struct process p[], int n) {
+    int i, cur = 0;
+    int ttat = 0, twt = 0;
+    double avgtat, avgtwt;
+    
+    // Sort processes by arrival time
+    for (i = 0; i < n - 1; i++) {
+        for (int j = i + 1; j < n; j++) {
+            if (p[i].at > p[j].at) {
+                struct process temp = p[i];
+                p[i] = p[j];
+                p[j] = temp;
+            }
+        }
+    }
+    
+    // FCFS scheduling calculation
+    for (i = 0; i < n; i++) {
+        if (cur < p[i].at) {
+            cur = p[i].at;  // Update current time to the process's arrival time if idle
+        }
+        p[i].ct = cur + p[i].bt;  // Calculate completion time
+        cur = p[i].ct;  // Update current time to completion time of this process
+        p[i].tat = p[i].ct - p[i].at;  // Turnaround time
+        p[i].wt = p[i].tat - p[i].bt;  // Waiting time
+        ttat += p[i].tat;  // Accumulate total turnaround time
+        twt += p[i].wt;  // Accumulate total waiting time
+    }
+
+    // Print process details and results
+    printf("\n \t\t pid \t bt \t at \t ct \t tat \t wt \n");
+    for (i = 0; i < n; i++) {
+        printf("\n \t\t %d \t\t %d \t\t %d \t\t %d \t\t %d \t\t %d \n", 
+               p[i].id, p[i].bt, p[i].at, p[i].ct, p[i].tat, p[i].wt);
+    }
+
+    avgtat = (double)(ttat) / n;
+    avgtwt = (double)(twt) / n;
+    printf("\nAverage Turnaround Time (TAT): %.2lf", avgtat);
+    printf("\nAverage Waiting Time (WT): %.2lf\n", avgtwt);
+}
+
 int main() {
-   int i, ctime = 0;  // Current time initialization to 0
- 
-   // Prompting the user to input the total number of processes
-   printf("Enter Total Processes:\t");
-   scanf("%d", &n);  // Storing the number of processes in variable 'n'
- 
-   // Loop to input the arrival time and burst time for each process
-   for(i = 0; i < n; i++) {
-       printf("Enter Arrival Time and Burst Time for Process Number %d: ", i+1);
-       scanf("%d", &p[i].at);  // Input arrival time for the process
-       scanf("%d", &p[i].bt);  // Input burst time for the process
-       p[i].rt = p[i].bt;      // Initialize remaining time with burst time
-       p[i].status = 0;        // Initialize status as not completed
-   }
- 
-   // Prompting the user to input the time quantum
-   printf("Enter Time Quantum:\t");
-   scanf("%d", &time_quantum);  // Storing the time quantum in variable 'time_quantum'
- 
-   dispatcher();  // Calling the dispatcher function to simulate Round Robin scheduling
- 
-   // Printing the results in a tabular format
-   printf("\n\nProcess\t|Finish Time\t|Turnaround Time|Waiting Time\n\n");
-   for(i = 0; i < n; i++) {
-       // Print Process ID, Finish Time, Turnaround Time, and Waiting Time
-       printf("P[%d]\t|\t%d\t|\t%d\t|\t%d\n", i+1, p[i].ft, p[i].tat, p[i].wt);
-   }
- 
-   return 0;  // End of the program, returning 0 indicates successful execution
+    int n, i;
+    printf("\nEnter number of processes: ");
+    scanf("%d", &n);
+    struct process p[n];
+    for (i = 0; i < n; i++) {
+        printf("Enter the arrival time of process %d: ", i + 1);
+        scanf("%d", &p[i].at);
+        printf("Enter the burst time of process %d: ", i + 1);
+        scanf("%d", &p[i].bt);
+        p[i].id = i + 1;  // Assign process ID
+    }
+    fcfs(p, n);
+    return 0;
 }
- 
-// Function to simulate the Round Robin scheduling algorithm
-void dispatcher() {
-   int CT = 0, pid = 0, count = 0;  // CT - Clock time, pid - process ID, count - number of completed processes
- 
-   // Loop until all processes are completed
-   while(count < n) {
-       // Check if the current process is ready to execute
-       if(p[pid].rt > 0 && p[pid].at <= CT) {
-           // If the current process can complete within the time quantum
-           if(p[pid].rt <= time_quantum) {
-               CT += p[pid].rt;  // Increase clock time by the remaining time of the process
-               p[pid].rt = 0;    // Set the remaining time to 0 (process completed)
-               p[pid].ft = CT;   // Set the finish time for the process
-               p[pid].tat = p[pid].ft - p[pid].at;  // Calculate turnaround time
-               p[pid].wt = p[pid].tat - p[pid].bt;  // Calculate waiting time
-               p[pid].status = 1; // Mark process as completed
-               count++;           // Increment the count of completed processes
-           } else {
-               p[pid].rt -= time_quantum;  // Reduce remaining time by the time quantum
-               CT += time_quantum;         // Increase clock time by the time quantum
-           }
-       }
- 
-       // Move to the next process in a round-robin manner
-       pid = (pid + 1) % n;  // Circular increment of process ID
-   }
+------------------------------------------------------------------------------------------------
+2.Round Robin:
+#include <stdio.h>
+
+struct process {
+    int pid;      // Process ID
+    int at;       // Arrival Time
+    int bt;       // Burst Time
+    int ct;       // Completion Time
+    int wt;       // Waiting Time
+    int tat;      // Turnaround Time
+    int rem_bt;   // Remaining Burst Time
+};
+
+int main() {
+    int n, time_quantum;
+
+    // Input the number of processes
+    printf("Enter the number of processes: ");
+    scanf("%d", &n);
+
+    struct process list[n];
+
+    // Input the arrival time and burst time for each process
+    for (int i = 0; i < n; i++) {
+        printf("Enter the arrival time and burst time for process %d: ", i + 1);
+        scanf("%d%d", &list[i].at, &list[i].bt);
+        list[i].pid = i + 1;
+        list[i].rem_bt = list[i].bt;
+        list[i].wt = 0;
+        list[i].tat = 0;
+        list[i].ct = 0;
+    }
+
+    // Input the time quantum
+    printf("Enter the time quantum: ");
+    scanf("%d", &time_quantum);
+
+    int current_time = 0; // Track the current time
+    int processes_remaining = n;
+
+    // Round Robin scheduling algorithm
+    while (processes_remaining > 0) {
+        int done_in_this_cycle = 0;
+
+        for (int i = 0; i < n; i++) {
+            // Process only if it has arrived and has remaining burst time
+            if (list[i].rem_bt > 0 && list[i].at <= current_time) {
+                done_in_this_cycle = 1;
+            int exec_time;
+if (list[i].rem_bt > time_quantum) {
+    exec_time = time_quantum;
+} else {
+    exec_time = list[i].rem_bt;
 }
- 
- 
+
+                // Update the time and remaining burst time
+                current_time += exec_time;
+                list[i].rem_bt -= exec_time;
+
+                // If process is completed
+                if (list[i].rem_bt == 0) {
+                    list[i].ct = current_time;  // Set completion time
+                    list[i].tat = list[i].ct - list[i].at; // Turnaround Time
+                    list[i].wt = list[i].tat - list[i].bt; // Waiting Time
+                    processes_remaining--;
+                }
+            }
+        }
+
+        // If no process was executed in this cycle, move time forward
+        if (!done_in_this_cycle) {
+            current_time++;
+        }
+    }
+
+    float total_wt = 0, total_tat = 0;
+
+    // Output the results
+    printf("\nProcess\tArrival Time\tBurst Time\tCompletion Time\tWaiting Time\tTurnaround Time\n");
+    for (int i = 0; i < n; i++) {
+        total_wt += list[i].wt;
+        total_tat += list[i].tat;
+        printf("%d\t%d\t\t%d\t\t%d\t\t%d\t\t%d\n", list[i].pid, list[i].at, list[i].bt, list[i].ct, list[i].wt, list[i].tat);
+    }
+
+    // Calculate and print the average waiting time and turnaround time
+    printf("\nAverage Waiting Time = %.2f", total_wt / n);
+    printf("\nAverage Turnaround Time = %.2f\n", total_tat / n);
+
+    return 0;
+}
+-----------------------------------------------------------------------------------------------
 3.SJF:
-#include<stdio.h>   // Including standard input-output header file
-#include<stdlib.h>  // Including standard library header file (not used in this program)
- 
-// Defining a structure to represent each process
-struct node {
-   int arr;  // Arrival time of the process
-   int ct;   // Completion time of the process
-   int bur;  // Burst time (execution time) of the process
+#include<stdio.h>
+struct process
+{
+int at;
+int bt;
+int id;
+int ct;
+int tat;
+int wt;
+int status;
 };
- 
-int main() {
-   struct node obj[100];  // Array to store up to 100 processes
-   int n, i, j, k, m;     // Declaring variables for loop control and number of processes
- 
-   // Asking the user to input the number of processes
-   printf("Enter the number of processes\n");
-   scanf("%d", &n);  // Storing the number of processes in variable 'n'
- 
-   // Loop to input the arrival time and burst time for each process
-   for(i = 0; i < n; i++) {
-       printf("Enter the arrival time of process %d\n", i+1);
-       scanf("%d", &obj[i].arr);  // Input arrival time for the process
- 
-       printf("Enter the burst time of process %d\n", i+1);
-       scanf("%d", &obj[i].bur);  // Input burst time for the process
- 
-       obj[i].ct = 0;  // Initializing the completion time to 0
-   }
- 
-   // Sorting processes based on their arrival time using bubble sort
-   struct node temp;  // Temporary variable for swapping processes
-   for(i = 0; i < n-1; i++) {
-       for(j = i+1; j < n; j++) {
-           if(obj[i].arr > obj[j].arr) {  // If the current process arrives later than the next process
-               temp = obj[j];  // Swap the processes
-               obj[j] = obj[i];
-               obj[i] = temp;
-           }
-       }
-   }
- 
-   // Implementing SJF (Shortest Job First) Non-Preemptive Scheduling
-   struct node n1;  // Temporary variable for swapping based on burst time
-   int wt[n];       // Array for waiting time
-   int tat[n];      // Array for turnaround time
- 
-   // Calculate the completion time, turnaround time, and waiting time for the first process
-   obj[0].ct = obj[0].arr + obj[0].bur;  // Completion time for the first process
-   tat[0] = obj[0].ct - obj[0].arr;      // Turnaround time = Completion time - Arrival time
-   wt[0] = tat[0] - obj[0].bur;          // Waiting time = Turnaround time - Burst time
- 
-   int time = obj[0].ct;  // Initialize the current time to the completion time of the first process
- 
-   // Loop to calculate the same for all remaining processes
-   for(i = 0; i < n-1; i++) {
-       int count = 0;
-       int sum = 0;
- 
-       // Calculate the sum of arrival times of the subsequent processes until one is ready
-       for(j = i+1; j < n; j++) {
-           sum += obj[j].arr;
-           count++;
-           if(sum >= time) {  // If the next process arrives after the current time, break
-               break;
-           }
-       }
- 
-       // Sort the processes that have arrived based on burst time (Shortest Job First)
-       for(k = i+1; k <= i+count; k++) {
-           for(m = i+1; m <= i+count; m++) {
-               if(obj[k].bur < obj[m].bur) {  // If a process has a shorter burst time, swap it to the front
-                   n1 = obj[k];
-                   obj[k] = obj[m];
-                   obj[m] = n1;
-               }
-           }
-       }
- 
-       // Calculate the completion time, turnaround time, and waiting time for the next process
-       obj[i+1].ct = obj[i].ct + obj[i+1].bur;  // Completion time = Previous process's completion time + current burst time
-       tat[i+1] = obj[i+1].ct - obj[i+1].arr;   // Turnaround time = Completion time - Arrival time
-       wt[i+1] = tat[i+1] - obj[i+1].bur;       // Waiting time = Turnaround time - Burst time
-   }
- 
-   // Printing the results in a tabular format
-   printf("AT\tBT\tCT\tWT\tTAT\n");  // Header for the table
-   for(i = 0; i < n; i++) {
-       printf("%d\t%d\t%d\t%d\t%d\n", obj[i].arr, obj[i].bur, obj[i].ct, wt[i], tat[i]);
-       // Print Arrival Time, Burst Time, Completion Time, Waiting Time, and Turnaround Time for each process
-   }
- 
-   return 0;  // End of the program, returning 0 indicates successful execution
+int dispatcher(struct process p[],int n,int cur)
+{
+int i,j,max=1000;
+for(i=0;i<n;i++)
+{
+if(p[i].status!=1&&p[i].at<=cur)
+{
+if(p[i].bt<=max)
+{
+max=p[i].bt;
+j=i;
 }
- 
- 
-4.SRJF:
-#include<stdio.h>   // Including standard input-output header file
-#include<stdlib.h>  // Including standard library header file (not used in this program)
- 
-// Defining a structure to represent each process
-struct node {
-   int arr;   // Arrival time of the process
-   int ct;    // Completion time of the process
-   int bur;   // Burst time (total execution time) of the process
-   int rem;   // Remaining burst time of the process
-   int stat;  // Status of the process (whether it's completed)
-   int wt;    // Waiting time of the process
-   int tat;   // Turnaround time of the process
+
+}
+}
+return j;
+}
+void sort(struct process p[],int n)
+{
+int i,j;
+int cur=0;
+int ttat=0;
+int twt=0;
+i=0;
+while(i<n)
+{
+j=dispatcher(p,n,cur);
+p[j].ct=cur+p[j].bt;
+cur=p[j].ct;
+p[j].tat=p[j].ct-p[j].at;
+ttat+=p[j].tat;
+p[j].wt=p[j].tat-p[j].bt;
+twt+=p[j].wt;
+p[j].status=1;
+i++;
+
+}
+printf(" \n \t\t pid \t bt \t at \t ct \t tat \t wt \n");
+for(i=0;i<n;i++)
+{
+printf("\n \t\t %d \t\t %d \t\t %d \t\t %d \t\t %d \t \t%d \n",p[i].id,p[i].bt,p[i].at,p[i].ct,p[i].tat,p[i].wt);
+}
+double avgtat=(double)(ttat)/n;
+double avgtwt=(double)(twt)/n;
+printf("\n avgtat: %.2lf",avgtat);
+printf("\n avgtwt: %.2lf",avgtwt);
+
+}
+int main()
+{
+int n,i;
+printf("\n enter no of processes: ");
+scanf("%d",&n);
+struct process p[n];
+for(i=0;i<n;i++)
+{
+printf("enter the arraival time of process %d :",i+1);
+scanf("%d",&p[i].at);
+printf("enter the burst time of process %d :",i+1);
+scanf("%d",&p[i].bt);
+p[i].id=i+1;
+p[i].status=0;
+}
+sort(p,n);
+return 0;
+}
+-------------------------------------------------------------------------------------------------      
+4.SRTF:
+#include <stdio.h>
+
+struct process {
+    int at;     // Arrival Time
+    int bt;     // Burst Time
+    int rt;     // Remaining Time
+    int id;     // Process ID
+    int ct;     // Completion Time
+    int tat;    // Turnaround Time
+    int wt;     // Waiting Time
+    int status; // Status (0 = not complete, 1 = complete)
 };
- 
+
+void srtf(struct process p[], int n) {
+    int completed = 0, cur = 0, min_rt = 1000;
+    int i, shortest = -1, finish_time;
+    int ttat = 0, twt = 0;
+    double avgtat, avgtwt;
+    
+    while (completed != n) {
+        for (i = 0; i < n; i++) {
+            if (p[i].at <= cur && p[i].status == 0 && p[i].rt < min_rt) {
+                min_rt = p[i].rt;
+                shortest = i;
+            }
+        }
+
+        if (shortest == -1) {
+            cur++;
+            continue;
+        }
+
+        p[shortest].rt--;
+        min_rt = p[shortest].rt;
+
+        if (min_rt == 0) {
+            min_rt = 1000;
+            completed++;
+            finish_time = cur + 1;
+            p[shortest].ct = finish_time;
+            p[shortest].tat = p[shortest].ct - p[shortest].at;
+            p[shortest].wt = p[shortest].tat - p[shortest].bt;
+            p[shortest].status = 1;
+            ttat += p[shortest].tat;
+            twt += p[shortest].wt;
+        }
+
+        cur++;
+    }
+
+    printf("\n \t\t pid \t bt \t at \t ct \t tat \t wt \n");
+    for (i = 0; i < n; i++) {
+        printf("\n \t\t %d \t\t %d \t\t %d \t\t %d \t\t %d \t\t %d \n", 
+               p[i].id, p[i].bt, p[i].at, p[i].ct, p[i].tat, p[i].wt);
+    }
+
+    avgtat = (double)(ttat) / n;
+    avgtwt = (double)(twt) / n;
+    printf("\nAverage Turnaround Time (TAT): %.2lf", avgtat);
+    printf("\nAverage Waiting Time (WT): %.2lf\n", avgtwt);
+}
+
 int main() {
-   struct node obj[100];  // Array to store up to 100 processes
-   int n, i, j, k, m;     // Declaring variables for loop control and number of processes
- 
-   // Asking the user to input the number of processes
-   printf("Enter the number of processes\n");
-   scanf("%d", &n);  // Storing the number of processes in variable 'n'
- 
-   // Loop to input the arrival time and burst time for each process
-   for(i = 0; i < n; i++) {
-       printf("Enter the arrival time of process %d\n", i+1);
-       scanf("%d", &obj[i].arr);  // Input arrival time for the process
- 
-       printf("Enter the burst time of process %d\n", i+1);
-       scanf("%d", &obj[i].bur);  // Input burst time for the process
- 
-       obj[i].ct = 0;              // Initializing the completion time to 0
-       obj[i].rem = obj[i].bur;    // Remaining burst time is initially the same as burst time
-       obj[i].stat = 0;            // Initializing the status to 0 (not completed)
-   }
- 
-   // Sorting processes based on their arrival time using bubble sort
-   struct node temp;  // Temporary variable for swapping processes
-   for(i = 0; i < n-1; i++) {
-       for(j = i+1; j < n; j++) {
-           if(obj[i].arr > obj[j].arr) {  // If the current process arrives later than the next process
-               temp = obj[j];  // Swap the processes
-               obj[j] = obj[i];
-               obj[i] = temp;
-           }
-       }
-   }
- 
-   // Implementing SRJF (Shortest Remaining Job First) Scheduling
-   int count = 0;  // Counter to track the number of completed processes
-   int time = 0;   // Variable to track the current time
- 
-   // Main loop to execute the SRJF algorithm
-   while(count != n) {
-       int s = -1;  // Variable to hold the index of the process with the shortest remaining time
- 
-       // Loop through all processes to find the one with the shortest remaining time that has arrived
-       for(i = 0, count = 0; i < n; i++) {
-           if(obj[i].rem == 0) {  // If the process is already completed
-               count++;           // Increment the count of completed processes
-               obj[i].stat = 1;   // Mark the process as completed
-               continue;          // Skip to the next process
-           }
-           if(obj[i].arr <= time) {  // If the process has arrived by the current time
-               if(s == -1 || obj[i].rem < obj[s].rem) {  // If this process has the shortest remaining time
-                   s = i;  // Set this process as the one to execute
-               }
-           }
-       }
- 
-       // If no process has arrived, increment the time and continue
-       if(s == -1) {
-           time++;
-           continue;
-       }
- 
-       // Execute the process with the shortest remaining time
-       obj[s].rem--;  // Decrease the remaining burst time
-       time++;        // Increment the current time
-       obj[s].ct = time;  // Update the completion time for the process
- 
-       // If the process is now completed, increment the count of completed processes
-       if(obj[s].rem == 0) {
-           count++;
-       }
-   }
- 
-   // Calculate Turnaround Time (TAT) and Waiting Time (WT) for each process
-   for(i = 0; i < n; i++) {
-       obj[i].tat = obj[i].ct - obj[i].arr;  // TAT = Completion Time - Arrival Time
-       obj[i].wt = obj[i].tat - obj[i].bur;  // WT = TAT - Burst Time
-   }
- 
-   // Printing the results in a tabular format
-   printf("AT\tBT\tCT\tWT\tTAT\n");  // Header for the table
-   for(i = 0; i < n; i++) {
-       printf("%d\t%d\t%d\t%d\t%d\n", obj[i].arr, obj[i].bur, obj[i].ct, obj[i].wt, obj[i].tat);
-       // Print Arrival Time, Burst Time, Completion Time, Waiting Time, and Turnaround Time for each process
-   }
- 
-   return 0;  // End of the program, returning 0 indicates successful execution
+    int n, i;
+    printf("\nEnter number of processes: ");
+    scanf("%d", &n);
+    struct process p[n];
+    for (i = 0; i < n; i++) {
+        printf("Enter the arrival time of process %d: ", i + 1);
+        scanf("%d", &p[i].at);
+        printf("Enter the burst time of process %d: ", i + 1);
+        scanf("%d", &p[i].bt);
+        p[i].id = i + 1;
+        p[i].rt = p[i].bt;  // Initially, remaining time is equal to burst time
+        p[i].status = 0;
+    }
+    srtf(p, n);
+    return 0;
 }
