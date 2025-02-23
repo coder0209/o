@@ -1,0 +1,346 @@
+1.identifytokens
+%{
+#include<stdio.h>
+%}
+
+%%
+"exit" return 0;
+bool|int|float|char {printf("keyword");}
+[-,+]?[0-9]+ printf("constants");
+[,.'"]+ printf("punctuation chars");
+[!@#$%^&*()]+ printf("special chars");
+[a-zA-Z]+ printf("identifiers");
+\n printf("\n");
+. printf("%s",yytext);
+%%
+
+int main() {
+
+	printf("enter the input to check for tokens : ");
+	yylex();
+}
+---------------------------------------------------------
+2.counttokens
+%{
+int n=0;
+%}
+
+%%
+exit return 1;
+"while"|"if"|"else"|"for"|"do"|"void"|"class"|"return"|"struct" {n++; printf("\tkeyword : %s",yytext);}
+"char"|"int"|"bool"|"float" {n++; printf("\tdata type : %s",yytext);}
+[a-zA-Z_][a-zA-Z0-9_]* {n++; printf("\tidentifier : %s",yytext);}
+"<"|"<="|"="|"=="|">="|">"|"+"|"++"|"--"|"*"|"/"|"-"|"%" {n++; printf("\toperator : %s",yytext);}
+[(){}|,;] {n++; printf("\tseperator : %s",yytext);}
+[0-9]*"."[0-9]+ {n++; printf("\tfloat : %s",yytext);}
+[1-9][0-9]* {n++; printf("\tinteger : %s",yytext);}
+\n printf("\n");
+. ;
+%%
+
+int main() {
+
+	printf("enter the input to count tokens from : ");
+	yylex();
+	printf("\nthe no of tokens are = %d\n",n);
+}
+----------------------------------------------
+3.mobile validation
+%{
+
+%}
+
+%%
+[1-9][0-9]{9} {printf("\nmobile number is valid!!");}
+. {printf("\nmobile number is invalid");}
+\n { printf("\n"); return 0;}
+%%
+
+int main() {
+
+	printf("enter the mobile number : ");
+	yylex();
+	return 0;
+}
+------------------------------------------------
+4.email
+%{
+int flag = 0;
+%}
+
+%%
+[a-z.0-9]+@[a-z]+".com"|".in" flag = 1;
+\n return 0;
+%%
+
+int main() {
+
+	printf("enter the email : ");
+	yylex();
+	if(flag == 1) {
+	
+		printf(" : email is accepted");
+	} else {
+
+		printf(" : email is rejected");
+	}
+}
+
+------------------------------------------------
+5.loop.l
+alpha [A-Za-z]
+digit [0-9]
+%%
+[ \t\n]
+for return FOR;
+int|bool|float|long return TYPE;
+(-){digit}+|{digit}+ return NUM;
+{alpha}({alpha}|{digit})* return ID;
+"<=" return LE;
+">=" return GE;
+"==" return EQ;
+"!=" return NE;
+"||" return OR;
+"&&" return AND;
+"++" return INC;
+"--" return DEC;
+. return yytext[0];
+%%
+loop.y
+%{
+#include <stdio.h>
+#include <stdlib.h>
+%}
+
+%token ID NUM FOR LE GE EQ NE OR AND INC DEC TYPE
+%right '='
+%left AND OR
+%left '<''>' LE GE EQ NE
+%left '+''-'
+%left '*''/'
+%right UMINUS
+%left '!'
+
+%%
+S  : ST1 {printf("Input accepted\n"); exit(0);}
+   ;
+ST1: FOR'('T';'E2';'E')' '{' ST '}'
+   ;
+T  : TYPE E
+   | E
+   ;
+ST : ST ST
+   | E';'
+   ;
+E  : ID'='E
+   | E'+'E
+   | E'-'E
+   | E'*'E
+   | E'/'E
+   | E'>'E
+   | E'<'E
+   | E LE E
+   | E GE E
+   | E EQ E
+   | E NE E
+   | E OR E
+   | E AND E
+   | ID
+   | ID INC
+   | ID DEC
+   | '('E')'
+   | NUM
+   ;
+E2 : E'>'E
+   | E'<'E
+   | E LE E
+   | E GE E
+   | E EQ E
+   | E NE E
+   | E OR E
+   | E AND E
+   | ID
+   | NUM
+   ;
+%%
+#include "lex.yy.c"
+int main()
+{
+   printf("Enter the exp: ");
+   yyparse();
+}
+
+
+------------------------------------------------
+6.branch.l
+
+
+ branch.y
+------------------------------------------------
+7.first follow
+from collections import OrderedDict
+
+def main():
+    first = OrderedDict()
+    follow = OrderedDict()
+    productions = OrderedDict()
+    terminals = ["+", "-", "E", "*", "/", "(", ")", "num", "name"]
+    n_ter = 9
+
+    for i in range(n_ter):
+        input_terminal = terminals[i]
+        first[input_terminal] = [input_terminal]
+
+    n_nter = 5
+    nonterminals = ["Expr", "Expr'", "Term", "Term'", "Factor"]
+
+    for i in range(n_nter):
+        input_nonterminal = nonterminals[i]
+        first[input_nonterminal] = [input_nonterminal]
+        follow[input_nonterminal] = ['$']
+
+    productions = {
+        "Expr": ["Term Expr'"],
+        "Expr'": ["+ Term Expr'", "- Term Expr'", "E"],
+        "Term": ["Factor Term'"],
+        "Term'": ["* Factor Term'", "/ Factor Term'", "E"],
+        "Factor": ["( Expr )", "num", "name"]
+    }
+
+    while True:
+        temp_first = OrderedDict(first)
+
+        for nonterminal in nonterminals:
+            all_productions = productions[nonterminal]
+            temp_set = set()  # Use a set to ensure uniqueness
+            for production in all_productions:
+                tokens = production.split()
+                s_first = tokens[0]
+                temp_set.update(first[s_first])  # Update the set with unique elements
+
+            temp_set.update(first[nonterminal])  # Ensure nonterminal's own elements are included
+            first[nonterminal] = list(temp_set)  # Convert back to list
+
+        if temp_first == first:
+            break
+    for nonterminal in nonterminals:
+        for nonterminal1 in nonterminals:
+            if nonterminal1 in first[nonterminal]:
+                first[nonterminal].remove(nonterminal1)
+
+    print("First")
+    for nonterminal in nonterminals:
+        print(nonterminal, first[nonterminal])
+        
+    while True:
+     temp_follow = OrderedDict(follow)
+     changes_made = False
+
+     for nonterminal in nonterminals:
+        for nonterminal1 in nonterminals:
+            all_productions = productions[nonterminal1]
+            for production in all_productions:
+                tokens = production.split()
+                length = len(tokens)
+                for i in range(length):
+                    if tokens[i] == nonterminal:
+                        if i + 1 < length:
+                            temp_list8 = list(follow[nonterminal])
+                            temp_list9 = list(first[tokens[i + 1]])
+
+                            if "E" in temp_list9:
+                                temp_list9.remove("E")
+                                temp_list9.extend(follow[nonterminal1])
+
+                            temp_list8.extend(temp_list9)
+                            unique_set = list(set(temp_list8))
+                            if set(follow[nonterminal]) != set(unique_set):
+                                follow[nonterminal] = unique_set
+                                changes_made = True
+                        else:
+                            temp_list10 = list(follow[nonterminal])
+                            temp_list11 = list(follow[nonterminal1])
+                            temp_list10.extend(temp_list11)
+                            unique_set = list(set(temp_list10))
+                            if set(follow[nonterminal]) != set(unique_set):
+                                follow[nonterminal] = unique_set
+                                changes_made = True
+
+     if not changes_made:
+        break
+
+    for nonterminal in nonterminals:
+        for nonterminal1 in nonterminals:
+            if nonterminal1 in follow[nonterminal]:
+                follow[nonterminal].remove(nonterminal1)
+
+    print("\n Follow")
+    for nonterminal in nonterminals:
+        print(nonterminal, follow[nonterminal])
+        
+        
+        
+                
+  
+if __name__ == "__main__":
+    main()
+------------------------------------------------
+8.function calls.l
+%%
+[\n \t]    ; 
+int|float|char|double   return TYPE; 
+return                 return RETURN; 
+[0-9]+    return NUM; 
+[a-zA-Z_]([a-zA-Z0-9_])* return ID; 
+.     return yytext[0]; 
+%%
+.y
+%{ 
+#include<stdio.h> 
+%} 
+%token NUM ID TYPE RETURN 
+%right '=' 
+%left '+' '-'  
+%left '*' '/' 
+ 
+%% 
+S :FUN{printf("Input accepted");exit(0);}; 
+ 
+FUN :TYPE ID'('PARAM')''{'BODY'}' ; 
+ 
+PARAM :PARAM','TYPE ID 
+ |TYPE ID 
+ |TYPE ID'='NUM 
+ |TYPE ID'['']' 
+ | 
+ ; 
+ 
+BODY :BODY BODY 
+ |PARAM';' 
+ |E';' 
+ |RETURN E';' 
+ | 
+ ; 
+
+E :ID'='E 
+ |E'+'E 
+ |E'-'E 
+ |E'*'E 
+ |E'/'E 
+ |ID'['NUM']''='E 
+ |ID'['NUM']' 
+ |NUM 
+ |ID 
+ ; 
+%%
+#include "lex.yy.c" 
+main() 
+{ 
+ printf("Enter exp:"); 
+ yyparse(); 
+}
+------------------------------------------------
+------------------------------------------------
+------------------------------------------------
+------------------------------------------------
+
