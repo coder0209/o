@@ -1,436 +1,400 @@
-1.identifytokens
-%{
-#include<stdio.h>
-%}
+# Credit: Raghavender
+#Exp2: chisquare test
+import nltk
+from collections import Counter
+from nltk.tokenize import word_tokenize
+from nltk.util import bigrams
+from nltk.corpus import stopwords
+import string
+stop_words=set(stopwords.words('english'))
 
-%%
-"exit" return 0;
-bool|int|float|char {printf("keyword");}
-[-,+]?[0-9]+ printf("constants");
-[,.'"]+ printf("punctuation chars");
-[!@#$%^&*()]+ printf("special chars");
-[a-zA-Z]+ printf("identifiers");
-\n printf("\n");
-. printf("%s",yytext);
-%%
+        
+sentences = [
+    "I love studying data science.",
+    "Data science is an interesting field.",
+    "Science requires data for analysis.",
+    "Data is key in modern science.",
+    "Data science helps in business decision-making."
+]
 
-int main() {
-
-	printf("enter the input to check for tokens : ");
-	yylex();
-}
----------------------------------------------------------
-2.counttokens
-%{
-int n=0;
-%}
-
-%%
-exit return 1;
-"while"|"if"|"else"|"for"|"do"|"void"|"class"|"return"|"struct" {n++; printf("\tkeyword : %s",yytext);}
-"char"|"int"|"bool"|"float" {n++; printf("\tdata type : %s",yytext);}
-[a-zA-Z_][a-zA-Z0-9_]* {n++; printf("\tidentifier : %s",yytext);}
-"<"|"<="|"="|"=="|">="|">"|"+"|"++"|"--"|"*"|"/"|"-"|"%" {n++; printf("\toperator : %s",yytext);}
-[(){}|,;] {n++; printf("\tseperator : %s",yytext);}
-[0-9]*"."[0-9]+ {n++; printf("\tfloat : %s",yytext);}
-[1-9][0-9]* {n++; printf("\tinteger : %s",yytext);}
-\n printf("\n");
-. ;
-%%
-
-int main() {
-
-	printf("enter the input to count tokens from : ");
-	yylex();
-	printf("\nthe no of tokens are = %d\n",n);
-}
-----------------------------------------------
-3.mobile validation
-%{
-
-%}
-
-%%
-[1-9][0-9]{9} {printf("\nmobile number is valid!!");}
-. {printf("\nmobile number is invalid");}
-\n { printf("\n"); return 0;}
-%%
-
-int main() {
-
-	printf("enter the mobile number : ");
-	yylex();
-	return 0;
-}
-------------------------------------------------
-4.email
-%{
-int flag = 0;
-%}
-
-%%
-[a-z.0-9]+@[a-z]+".com"|".in" flag = 1;
-\n return 0;
-%%
-
-int main() {
-
-	printf("enter the email : ");
-	yylex();
-	if(flag == 1) {
-	
-		printf(" : email is accepted");
-	} else {
-
-		printf(" : email is rejected");
-	}
-}
-
-------------------------------------------------
-5.loop.l
-alpha [A-Za-z]
-digit [0-9]
-%%
-[ \t\n]
-for return FOR;
-int|bool|float|long return TYPE;
-(-){digit}+|{digit}+ return NUM;
-{alpha}({alpha}|{digit})* return ID;
-"<=" return LE;
-">=" return GE;
-"==" return EQ;
-"!=" return NE;
-"||" return OR;
-"&&" return AND;
-"++" return INC;
-"--" return DEC;
-. return yytext[0];
-%%
-loop.y
-%{
-#include <stdio.h>
-#include <stdlib.h>
-%}
-
-%token ID NUM FOR LE GE EQ NE OR AND INC DEC TYPE
-%right '='
-%left AND OR
-%left '<''>' LE GE EQ NE
-%left '+''-'
-%left '*''/'
-%right UMINUS
-%left '!'
-
-%%
-S  : ST1 {printf("Input accepted\n"); exit(0);}
-   ;
-ST1: FOR'('T';'E2';'E')' '{' ST '}'
-   ;
-T  : TYPE E
-   | E
-   ;
-ST : ST ST
-   | E';'
-   ;
-E  : ID'='E
-   | E'+'E
-   | E'-'E
-   | E'*'E
-   | E'/'E
-   | E'>'E
-   | E'<'E
-   | E LE E
-   | E GE E
-   | E EQ E
-   | E NE E
-   | E OR E
-   | E AND E
-   | ID
-   | ID INC
-   | ID DEC
-   | '('E')'
-   | NUM
-   ;
-E2 : E'>'E
-   | E'<'E
-   | E LE E
-   | E GE E
-   | E EQ E
-   | E NE E
-   | E OR E
-   | E AND E
-   | ID
-   | NUM
-   ;
-%%
-#include "lex.yy.c"
-int main()
-{
-   printf("Enter the exp: ");
-   yyparse();
-}
+bigram_count={}
+for sentence in sentences:
+    sentence=sentence.lower()
+    tokens=word_tokenize(sentence)
+    tokens_new=[token for token in tokens if token not in stop_words and token not in string.punctuation]
+    bigram_list=list(bigrams(tokens_new))
+    for bigram in bigram_list:
+        bigram_count[bigram]=bigram_count.get(bigram,0)+1
 
 
-------------------------------------------------
-6.branch.l
-%{
-#include "y.tab.h"
-%}
+word1=input("Enter the word1:")
+word2=input("Enter the word2:")
+# contingency matrix
+C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
 
-alpha [A-Za-z]
-digit [0-9]
+# Updating contingency matrix based on word1 and word2
+for units in bigram_count:
+    if units[0] == word1 and units[1] == word2:
+        C[0][0] += bigram_count[units]  # word1 and word2
+    elif units[0] == word1 and units[1] != word2:
+        C[0][1] += bigram_count[units]  # word1 and not word2
+    elif units[0] != word1 and units[1] == word2:
+        C[1][0] += bigram_count[units]  # not word1 and word2
+    else:
+        C[1][1] += bigram_count[units]  # not word1 and not word2
 
-%%
+# total matrix
+# Updating contingency matrix based on word1 and word2
+C[0][2] = C[0][0] + C[0][1]  
+C[1][2] = C[1][0] + C[1][1] 
+C[2][0] = C[0][0] + C[1][0]  
+C[2][1] = C[0][1] + C[1][1] 
+tot = C[2][0] + C[2][1]
 
-if      return IF;
-then    return THEN;
-else    return ELSE;
-{digit}+    return NUM;
-{alpha}({alpha}|{digit})*    return ID;
+print("Contingency matrix:")
+for row in C:
+    print(" ".join(str(val) for val in row))
 
-"<="    return LE;
-">="    return GE;
-"=="    return EQ;
-"!="    return NE;
-"||"    return OR;
-"&&"    return AND;
+# expected matrix
+E = [[0, 0], [0, 0]]
 
-[ \t\n] ;   /* Ignore whitespace */
-.       return yytext[0];
+# Calculate expected values based on contingency matrix and total occurrences
+E[0][0] = (C[0][2] * C[2][0]) / tot  # expected occurrences of word1 and word2
+E[0][1] = (C[0][2] * C[2][1]) / tot  # expected occurrences of word1 and not word2
+E[1][0] = (C[1][2] * C[2][0]) / tot  # expected occurrences of not word1 and word2
+E[1][1] = (C[1][2] * C[2][1]) / tot  # expected occurrences of neither word1 nor word2
 
-%%
+print("Expected matrix:")
+for row in E:
+    print(" ".join(f"{val:.2f}" for val in row))
 
- branch.y
-%{
-#include <stdio.h>
-#include <stdlib.h>
-%}
+obs_mat = [C[0][0], C[0][1], C[1][0], C[1][1]]
+exp_mat = [E[0][0], E[0][1], E[1][0], E[1][1]]
 
-%token ID NUM IF THEN LE GE EQ NE OR AND ELSE
+chi2test=0
+for i in range(4):
+    chi2test+=(obs_mat[i]-exp_mat[i])**2/exp_mat[i] #summation of O-E whole square by E
 
-%right '='
-%left AND OR
-%left '<' '>' LE GE EQ NE
-%left '+' '-'
-%left '*' '/'
-%right UMINUS
-%left '!'
+cric_val=float(input("Enter critical value:"))
 
-%%
+if(chi2test>cric_val):
+    print("Reject H0")
+else:
+    print("Accept H0")
+___________________________
+#Exp 2: ttest
+import pandas as pd
+import string
+import numpy as np
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.util import bigrams
 
-S   : ST { printf("Input accepted.\n"); exit(0); };
 
-ST  : IF '(' E2 ')' THEN ST1 ';' ELSE ST1 ';'
-    | IF '(' E2 ')' THEN ST1 ';'
-    ;
+def unigram_fun(sentence):
+    sentence=sentence.lower()
+    tokens=word_tokenize(sentence)
+    token_1=[token for token in tokens if token not in string.punctuation and token not in stop_words]
+    return token_1
 
-ST1 : ST
-    | E
-    ;
+def bigram_fun(sentence):
+    sentence=sentence.lower()
+    tokens=word_tokenize(sentence)
+    token_1=[token for token in tokens if token not in string.punctuation and token not in stop_words]
+    bigram_list=list(bigrams(token_1))
+    return bigram_list
 
-E   : ID '=' E
-    | E '+' E
-    | E '-' E
-    | E '*' E
-    | E '/' E
-    | E '<' E
-    | E '>' E
-    | E LE E
-    | E GE E
-    | E EQ E
-    | E NE E
-    | E OR E
-    | E AND E
-    | ID
-    | NUM
-    ;
 
-E2  : E '<' E
-    | E '>' E
-    | E LE E
-    | E GE E
-    | E EQ E
-    | E NE E
-    | E OR E
-    | E AND E
-    | ID
-    | NUM
-    ;
+df=pd.read_csv('sastralines.csv')
+df_new = df.iloc[:,0]
+df_new_list = df_new.tolist()
+stop_words=set(stopwords.words('english'))
+unigrams=[unigram_fun(sentence) for sentence in df_new_list]
+bigrams=[bigram_fun(sentence) for sentence in df_new_list]
+print(df_new_list)
 
-%%
+#Calculaing the length of the corpus
+N=0
+for line in df_new_list:
+    N=N+len(line)
 
-#include "lex.yy.c"
+print("The length of the corpus is:",N)
 
-int main() {
-    printf("Enter the expression: ");
-    yyparse();
-    return 0;
-}
-------------------------------------------------
-7.first follow
-from collections import OrderedDict
 
-def main():
-    first = OrderedDict()
-    follow = OrderedDict()
-    productions = OrderedDict()
-    terminals = ["+", "-", "E", "*", "/", "(", ")", "num", "name"]
-    n_ter = 9
+#unigram_dict
+unigram_dict={}
+for line in unigrams:
+    for word in line:
+        unigram_dict[word]=0
+for line in unigrams:
+    for word in line:
+        unigram_dict[word]=unigram_dict[word]+1
 
-    for i in range(n_ter):
-        input_terminal = terminals[i]
-        first[input_terminal] = [input_terminal]
+#bigram_dict
+bigram_dict={}
+for line in bigrams:
+    for word in line:
+        bigram_dict[word]=0
+for line in bigrams:
+    for word in line:
+        bigram_dict[word]=bigram_dict[word]+1
 
-    n_nter = 5
-    nonterminals = ["Expr", "Expr'", "Term", "Term'", "Factor"]
 
-    for i in range(n_nter):
-        input_nonterminal = nonterminals[i]
-        first[input_nonterminal] = [input_nonterminal]
-        follow[input_nonterminal] = ['$']
+a=input("Enter the 1st word:")
+b=input("Enter the 2nd word:")
+cv=float(input("Enter the critical value:"))
 
-    productions = {
-        "Expr": ["Term Expr'"],
-        "Expr'": ["+ Term Expr'", "- Term Expr'", "E"],
-        "Term": ["Factor Term'"],
-        "Term'": ["* Factor Term'", "/ Factor Term'", "E"],
-        "Factor": ["( Expr )", "num", "name"]
+#observerd mean
+O=(bigram_dict[(a,b)]/N) 
+
+#Expected mean
+E=((unigram_dict[a]/N)*(unigram_dict[b]/N))
+
+#variance
+variance=E
+
+ttest = (O-E)/np.sqrt((variance/N))
+print(ttest)
+
+if(ttest<cv):
+    print("Accept H0")
+else:
+    print("Reject H0")
+---------------------
+# Baari
+# OPTIMIZED
+import pandas as pd
+import string
+import nltk
+import math
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from collections import defaultdict
+
+# Load data
+df = pd.read_csv("Bank.csv")
+train_data = df.iloc[0:93, :]
+test_data = df.iloc[94:, :]
+stop_words = set(stopwords.words('english'))
+
+# Initialize counters
+fin_class = riv_class = 0
+fin_word_freq = defaultdict(int)
+riv_word_freq = defaultdict(int)
+
+# Preprocess and count word occurrences per class
+for _, row in train_data.iterrows():
+    tokens = [word for word in word_tokenize(row['Sentence']) if word not in stop_words and word not in string.punctuation]
+    
+    if row['Class'] == 'Financial Institution':
+        fin_class += 1
+        for word in tokens:
+            fin_word_freq[word] += 1
+    elif row['Class'] == 'River Border':
+        riv_class += 1
+        for word in tokens:
+            riv_word_freq[word] += 1
+
+# Calculate prior probabilities
+tot_class = fin_class + riv_class
+prior_fin_class = math.log2(fin_class / tot_class)
+prior_riv_class = math.log2(riv_class / tot_class)
+
+# Vocabulary size
+vocab = set(list(fin_word_freq.keys()) + list(riv_word_freq.keys()))
+V = len(vocab)
+
+# Test phase
+for _, row in test_data.iterrows():
+    tokens = [word for word in word_tokenize(row['Sentence']) if word not in stop_words and word not in string.punctuation]
+
+    score_fin = prior_fin_class
+    score_riv = prior_riv_class
+    
+    for word in tokens:
+        score_fin += math.log2(fin_word_freq[word] + 1) - math.log2(fin_class + V)
+        score_riv += math.log2(riv_word_freq[word] + 1) - math.log2(riv_class + V)
+
+    print("Sense is Financial Institution" if score_fin > score_riv else "Sense is River Border")
+______________________________
+
+# Ahmed Baari 
+# OPTIMIZED VERSION 
+# WARNING: CHECK WITH VALID TESTCASES
+import nltk
+import math
+import string
+from collections import defaultdict
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk import bigrams
+
+# Input for preposition, noun, and verb
+prep = input("Enter the preposition: ").lower()
+noun = input("Enter the noun: ").lower()
+verb = input("Enter the verb: ").lower()
+
+# Stopwords and punctuation setup
+stop_words = set(stopwords.words('english'))
+
+# Using defaultdict to avoid manual key checking
+unigram_dict = defaultdict(int)
+bigram_dict = defaultdict(int)
+
+# List of sentences to analyze
+sentences = [
+    "Saw the phone with me.",
+    "Went to the meeting yesterday.",
+    "Told the man to wait.",
+    "Gave the book to her.",
+    "Saw the cat with her."
+]
+
+# Processing each sentence
+for sentence in sentences:
+    tokens = word_tokenize(sentence)
+    tokens_cleaned = [token.lower() for token in tokens if token not in string.punctuation]
+    
+    # Counting unigrams
+    for word in tokens_cleaned:
+        unigram_dict[word] += 1
+    
+    # Counting bigrams
+    for bg in bigrams(tokens_cleaned):
+        bigram_dict[bg] += 1
+
+# Default values for unseen bigrams/unigrams
+p_noun_prep = bigram_dict[(noun, prep)] / unigram_dict[noun] if unigram_dict[noun] != 0 else 0
+p_verb_prep = bigram_dict[(verb, prep)] / unigram_dict[verb] if unigram_dict[verb] != 0 else 0
+p_0_n = 1 - p_noun_prep
+
+# Ensure that the log argument is valid
+if p_noun_prep > 0 and p_verb_prep * p_0_n > 0:
+    lammbda = math.log2((p_verb_prep * p_0_n) / p_noun_prep)
+    print("Attached with Verb." if lammbda >= 0 else "Attached with Noun.")
+else:
+    print("No valid attachments.")
+-----------------------------------
+# A: forward procedure
+# Credit: Raghavender
+emission_probs = {'A': {'K': 0.4, 
+                        'T': 0.5}, 
+                  'B': {'K': 0.3, 
+                        'T': 0.3}
+                        }
+alpha_a = 1
+alpha_b = 0
+alpha_A = [alpha_a]
+alpha_B = [alpha_b]
+
+visible_states = ['K', 'T','K']  # Update with the actual visible states
+
+for state in visible_states:
+    old_alpha = alpha_a
+    alpha_a = (alpha_a * 0.2 * emission_probs["A"][state]) + (alpha_b * 0.6 * emission_probs["B"][state])
+    alpha_b = (old_alpha * 0.8 * emission_probs["A"][state]) + (alpha_b * 0.4 * emission_probs["B"][state])
+    alpha_A.append(alpha_a)
+    alpha_B.append(alpha_b)
+
+print(alpha_A)
+print(alpha_B)
+
+# B. BACKWARD PROCEDURE
+# Credit: Ahmed Baari
+# Backward
+emission_probs = {
+    'A': {'K': 0.4, 'T': 0.5}, 
+    'B': {'K': 0.3, 'T': 0.3}
     }
 
-    while True:
-        temp_first = OrderedDict(first)
+b_A = 1
+b_B = 1
+beta_A = [b_A]
+beta_B = [b_B]
 
-        for nonterminal in nonterminals:
-            all_productions = productions[nonterminal]
-            temp_set = set()  # Use a set to ensure uniqueness
-            for production in all_productions:
-                tokens = production.split()
-                s_first = tokens[0]
-                temp_set.update(first[s_first])  # Update the set with unique elements
+for state in reversed(visible_states):
+    old_bA = b_A
 
-            temp_set.update(first[nonterminal])  # Ensure nonterminal's own elements are included
-            first[nonterminal] = list(temp_set)  # Convert back to list
+    b_A = (
+        b_A * 0.2 * emission_probs["A"][state]
+    ) + (  
+        b_B * 0.8 * emission_probs["A"][state]
+    )
 
-        if temp_first == first:
-            break
-    for nonterminal in nonterminals:
-        for nonterminal1 in nonterminals:
-            if nonterminal1 in first[nonterminal]:
-                first[nonterminal].remove(nonterminal1)
+    b_B = (
+        old_bA * 0.6 * emission_probs["B"][state]
+    ) + (
+        b_B * 0.4 * emission_probs["B"][state]
+    )         
 
-    print("First")
-    for nonterminal in nonterminals:
-        print(nonterminal, first[nonterminal])
-        
-    while True:
-     temp_follow = OrderedDict(follow)
-     changes_made = False
+    beta_A.append(b_A)
+    beta_B.append(b_B)
 
-     for nonterminal in nonterminals:
-        for nonterminal1 in nonterminals:
-            all_productions = productions[nonterminal1]
-            for production in all_productions:
-                tokens = production.split()
-                length = len(tokens)
-                for i in range(length):
-                    if tokens[i] == nonterminal:
-                        if i + 1 < length:
-                            temp_list8 = list(follow[nonterminal])
-                            temp_list9 = list(first[tokens[i + 1]])
+# Reverse the Beta list for correct order
+beta_A.reverse()
+beta_B.reverse()
 
-                            if "E" in temp_list9:
-                                temp_list9.remove("E")
-                                temp_list9.extend(follow[nonterminal1])
 
-                            temp_list8.extend(temp_list9)
-                            unique_set = list(set(temp_list8))
-                            if set(follow[nonterminal]) != set(unique_set):
-                                follow[nonterminal] = unique_set
-                                changes_made = True
-                        else:
-                            temp_list10 = list(follow[nonterminal])
-                            temp_list11 = list(follow[nonterminal1])
-                            temp_list10.extend(temp_list11)
-                            unique_set = list(set(temp_list10))
-                            if set(follow[nonterminal]) != set(unique_set):
-                                follow[nonterminal] = unique_set
-                                changes_made = True
+# C. BEST STATE SEQUENCE 
+# Credit: Ahmed Baari 
+gamma_A = []
+gamma_B = []
 
-     if not changes_made:
-        break
+# alpha * beta of A / that of A + that of B
 
-    for nonterminal in nonterminals:
-        for nonterminal1 in nonterminals:
-            if nonterminal1 in follow[nonterminal]:
-                follow[nonterminal].remove(nonterminal1)
+for i in range(3):
+    g_A = (
+        alpha_A[i] * beta_A[i]
+    ) / (
+        alpha_A[i]*beta_A[i] + alpha_B[i]*beta_B[i]
+    )
+    g_B = (
+        alpha_B[i] * beta_B[i] 
+    ) / (
+        alpha_B[i] * beta_B[i] + alpha_A[i] * beta_A[i]
+    )
 
-    print("\n Follow")
-    for nonterminal in nonterminals:
-        print(nonterminal, follow[nonterminal])
-        
-        
-        
-                
-  
-if __name__ == "__main__":
-    main()
-------------------------------------------------
-8.function calls.l
-%%
-[\n \t]    ; 
-int|float|char|double   return TYPE; 
-return                 return RETURN; 
-[0-9]+    return NUM; 
-[a-zA-Z_]([a-zA-Z0-9_])* return ID; 
-.     return yytext[0]; 
-%%
-.y
-%{ 
-#include<stdio.h> 
-%} 
-%token NUM ID TYPE RETURN 
-%right '=' 
-%left '+' '-'  
-%left '*' '/' 
- 
-%% 
-S :FUN{printf("Input accepted");exit(0);}; 
- 
-FUN :TYPE ID'('PARAM')''{'BODY'}' ; 
- 
-PARAM :PARAM','TYPE ID 
- |TYPE ID 
- |TYPE ID'='NUM 
- |TYPE ID'['']' 
- | 
- ; 
- 
-BODY :BODY BODY 
- |PARAM';' 
- |E';' 
- |RETURN E';' 
- | 
- ; 
+    gamma_A.append(g_A)
+    gamma_B.append(g_B)
 
-E :ID'='E 
- |E'+'E 
- |E'-'E 
- |E'*'E 
- |E'/'E 
- |ID'['NUM']''='E 
- |ID'['NUM']' 
- |NUM 
- |ID 
- ; 
-%%
-#include "lex.yy.c" 
-main() 
-{ 
- printf("Enter exp:"); 
- yyparse(); 
-}
-------------------------------------------------
-------------------------------------------------
-------------------------------------------------
-------------------------------------------------
+for i in range(3):
+    print( 
+        "A" if gamma_A[i] > gamma_B[i] else "B", 
+        end=" "
+    )
+-------------------
+# Credit: Ahmed Baari
+# Exp 6: viterbi sequence
+emission_probs = {
+    "CP": {"cola": 0.6, "ice_tea": 0.1, "lem": 0.3}, 
+    "IP": {"cola": 0.1, "ice_tea": 0.7, "lem": 0.2}
+    }
+alpha_a = 1
+alpha_b = 0
 
+for _ in range(3):
+    state = input("Enter the state:")
+    alpha_a = max(alpha_a * 0.7 * emission_probs["CP"][state], 
+                           alpha_b * 0.5 * emission_probs["IP"][state])
+                           
+    alpha_b = max(alpha_a * 0.3 * emission_probs["CP"][state], 
+                           alpha_b * 0.5 * emission_probs["IP"][state])
+    print(alpha_a, alpha_b)
+    print("CP" if alpha_a > alpha_b else "IP")
+_____________________
+#pcfg
+from nltk import PCFG, InsideChartParser
+grammar = PCFG.fromstring("""
+S -> NP VP [1.0]
+NP -> NP PP [0.4] | 'he' [0.1] | 'dessert' [0.3] | 'lunch' [0.1] | 'saw' [0.1]
+PP -> Pre NP [1.0]
+VP -> Verb NP [0.3] | VP PP [0.7]
+Pre -> 'with' [0.6] | 'in' [0.4]
+Verb -> 'ate' [0.7] | 'saw' [0.3]
+""")
+parser = InsideChartParser(grammar)
+tokens = "he saw lunch with dessert".split()
+for tree in parser.parse(tokens):
+    tree.pretty_print()
+    print("PROBABILITY: ",tree.prob())
+    #tree.draw()
