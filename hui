@@ -1,430 +1,578 @@
-import nltk
-import string
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer, WordNetLemmatizer
+EXP 5: FIRST, FOLLOW SETS:
+CODE:
+#include<stdio.h>
+#include<math.h>
+#include<string.h>
+#include<ctype.h>
+#include<stdlib.h>
+int n,m=0,p,i=0,j=0; char a[10][10],f[10]; void follow(char c); void first(char c);
+int main(){
 
-#tokenize
-sentence = "SASTRA University is a great place. It has amazing facilities!"
-words=nltk.word_tokenize(sentence)
-print(words)
-
-#stopwords removal
-stop_words = set(stopwords.words('english'))
-words_1=[word for word in words if word not in stop_words]
-print(words_1)
-
-#punctuation removal
-words_2= [word for word in words_1 if word not in string.punctuation]
-print(words_2)
-
-# stemming
-stemmer = PorterStemmer()
-words_3 = [stemmer.stem(word) for word in words_2]
-print(words_3)
-
-# lemmatization
-lemmatizer = WordNetLemmatizer()
-words_4 = [lemmatizer.lemmatize(word) for word in words_3]
-print(words_4)
-__--------------------------
-# Credit: Raghavender
-#Exp2: chisquare test
-import nltk
-from collections import Counter
-from nltk.tokenize import word_tokenize
-from nltk.util import bigrams
-from nltk.corpus import stopwords
-import string
-stop_words=set(stopwords.words('english'))
-
-        
-sentences = [
-    "I love studying data science.",
-    "Data science is an interesting field.",
-    "Science requires data for analysis.",
-    "Data is key in modern science.",
-    "Data science helps in business decision-making."
-]
-
-bigram_count={}
-for sentence in sentences:
-    sentence=sentence.lower()
-    tokens=word_tokenize(sentence)
-    tokens_new=[token for token in tokens if token not in stop_words and token not in string.punctuation]
-    bigram_list=list(bigrams(tokens_new))
-    for bigram in bigram_list:
-        bigram_count[bigram]=bigram_count.get(bigram,0)+1
-
-
-word1=input("Enter the word1:")
-word2=input("Enter the word2:")
-# contingency matrix
-C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
-
-# Updating contingency matrix based on word1 and word2
-for units in bigram_count:
-    if units[0] == word1 and units[1] == word2:
-        C[0][0] += bigram_count[units]  # word1 and word2
-    elif units[0] == word1 and units[1] != word2:
-        C[0][1] += bigram_count[units]  # word1 and not word2
-    elif units[0] != word1 and units[1] == word2:
-        C[1][0] += bigram_count[units]  # not word1 and word2
-    else:
-        C[1][1] += bigram_count[units]  # not word1 and not word2
-
-# total matrix
-# Updating contingency matrix based on word1 and word2
-C[0][2] = C[0][0] + C[0][1]  
-C[1][2] = C[1][0] + C[1][1] 
-C[2][0] = C[0][0] + C[1][0]  
-C[2][1] = C[0][1] + C[1][1] 
-tot = C[2][0] + C[2][1]
-
-print("Contingency matrix:")
-for row in C:
-    print(" ".join(str(val) for val in row))
-
-# expected matrix
-E = [[0, 0], [0, 0]]
-
-# Calculate expected values based on contingency matrix and total occurrences
-E[0][0] = (C[0][2] * C[2][0]) / tot  # expected occurrences of word1 and word2
-E[0][1] = (C[0][2] * C[2][1]) / tot  # expected occurrences of word1 and not word2
-E[1][0] = (C[1][2] * C[2][0]) / tot  # expected occurrences of not word1 and word2
-E[1][1] = (C[1][2] * C[2][1]) / tot  # expected occurrences of neither word1 nor word2
-
-print("Expected matrix:")
-for row in E:
-    print(" ".join(f"{val:.2f}" for val in row))
-
-obs_mat = [C[0][0], C[0][1], C[1][0], C[1][1]]
-exp_mat = [E[0][0], E[0][1], E[1][0], E[1][1]]
-
-chi2test=0
-for i in range(4):
-    chi2test+=(obs_mat[i]-exp_mat[i])**2/exp_mat[i] #summation of O-E whole square by E
-
-cric_val=float(input("Enter critical value:"))
-
-if(chi2test>cric_val):
-    print("Reject H0")
+int i,z; char c,ch;
+printf("Enter the no of productions:\n"); scanf("%d",&n);
+printf("Enter the productions:\n"); for(i=0;i<n;i++) scanf("%s%c",a[i],&ch);
+do{ m=0;
+printf("Enter the elemets whose first & follow is to be found:"); scanf("%c",&c);
+first(c); printf("First(%c)={",c); for(i=0;i<m;i++) printf("%c",f[i]);
+printf("}\n");
+strcpy(f," "); m=0;
+follow(c); printf("Follow(%c)={",c);
+for(i=0;i<m;i++) printf("%c",f[i]);
+printf("}\n");
+printf("Continue(0/1)?");
+scanf("%d%c",&z,&ch);
+}while(z==1);
+return(0);
+}
+void first(char c)
+{
+int k; if(!isupper(c)) f[m++]=c; for(k=0;k<n;k++)
+{ if(a[k][0]==c)//TERMINAL
+{
+if(a[k][2]=='$')
+follow(a[k][0]);
+else if(islower(a[k][2]))//TERMINAL
+f[m++]=a[k][2];
+else
+first(a[k][2]);
+}
+}
+}
+void follow(char c)
+{ if(a[0][0]==c)
+f[m++]='$';
+for(i=0;i<n;i++)
+{
+for(j=2;j<strlen(a[i]);j++)
+{
+if(a[i][j]==c)
+{
+if(a[i][j+1]!='\0')
+first(a[i][j+1]); if(a[i][j+1]=='\0' && c!=a[i][0]) follow(a[i][0]);
+}
+}
+}
+}
+-------------------------------------------------------------------
+EXP 6:LL(1) PARSER:
+CODE:
+table={'E':{'id':'TR','(':'TR'},'R':{'+':'+TR',')':'e','$':'e'},'T':{'id':'FY','(':'FY'},'Y':{'+':'e','*':'*FY',')':'e','$':'e'},'F':{'id':'id','(':'(E)'}
+}
+inp='id + id * id $'
+w=inp.split(' ')
+i=0
+word=w[i]
+stack=[]
+stack.append('$')
+stack.append('E')
+focus=stack[1]
+terminal=['*','+','*','id','(',')','e','-','$']
+while(focus):
+print('f',focus)
+print('w',word)
+if(focus=='$' and word=='$'):
+print('input string is valid')
+break
+elif(focus in terminal):
+if(focus == word):
+print('reduce')
+stack.pop()
+s=len(stack)-1
+focus=stack[s]
+i=i+1
+word=w[i]
 else:
-    print("Accept H0")
-___________________________
-#Exp 2: ttest
-import pandas as pd
-import string
-import numpy as np
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.util import bigrams
+e=stack.pop()
+print(table[e])
+if(word not in table[e]):
+print('error')
+break;
+if(table[e][word]):
 
-
-def unigram_fun(sentence):
-    sentence=sentence.lower()
-    tokens=word_tokenize(sentence)
-    token_1=[token for token in tokens if token not in string.punctuation and token not in stop_words]
-    return token_1
-
-def bigram_fun(sentence):
-    sentence=sentence.lower()
-    tokens=word_tokenize(sentence)
-    token_1=[token for token in tokens if token not in string.punctuation and token not in stop_words]
-    bigram_list=list(bigrams(token_1))
-    return bigram_list
-
-
-df=pd.read_csv('sastralines.csv')
-df_new = df.iloc[:,0]
-df_new_list = df_new.tolist()
-stop_words=set(stopwords.words('english'))
-unigrams=[unigram_fun(sentence) for sentence in df_new_list]
-bigrams=[bigram_fun(sentence) for sentence in df_new_list]
-print(df_new_list)
-
-#Calculaing the length of the corpus
-N=0
-for line in df_new_list:
-    N=N+len(line)
-
-print("The length of the corpus is:",N)
-
-
-#unigram_dict
-unigram_dict={}
-for line in unigrams:
-    for word in line:
-        unigram_dict[word]=0
-for line in unigrams:
-    for word in line:
-        unigram_dict[word]=unigram_dict[word]+1
-
-#bigram_dict
-bigram_dict={}
-for line in bigrams:
-    for word in line:
-        bigram_dict[word]=0
-for line in bigrams:
-    for word in line:
-        bigram_dict[word]=bigram_dict[word]+1
-
-
-a=input("Enter the 1st word:")
-b=input("Enter the 2nd word:")
-cv=float(input("Enter the critical value:"))
-
-#observerd mean
-O=(bigram_dict[(a,b)]/N) 
-
-#Expected mean
-E=((unigram_dict[a]/N)*(unigram_dict[b]/N))
-
-#variance
-variance=E
-
-ttest = (O-E)/np.sqrt((variance/N))
-print(ttest)
-
-if(ttest<cv):
-    print("Accept H0")
+right=table[e][word]
+if(right=='id'):
+stack.append('id')
 else:
-    print("Reject H0")
----------------------
-# Baari
-# OPTIMIZED
-import pandas as pd
-import string
-import nltk
-import math
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from collections import defaultdict
+for j in range(len(right)-1,-1,-1):
+if(right[j]!='e'):
+stack.append(right[j])
+print(stack)
+s=len(stack)-1
+focus=stack[s]
+('f', 'E')
+('w', 'id')
+{'(': 'TR', 'id': 'TR'}
+['$', 'R', 'T']
+('f', 'T')
+('w', 'id')
+{'(': 'FY', 'id': 'FY'}
+['$', 'R', 'Y', 'F']
+('f', 'F')
+('w', 'id')
+{'(': '(E)', 'id': 'id'}
+['$', 'R', 'Y', 'id']
+('f', 'id')
+('w', 'id')
+reduce
+('f', 'Y')
+('w', '+')
+{')': 'e', '+': 'e', '*': '*FY', '$': 'e'}
+['$', 'R']
+('f', 'R')
+('w', '+')
+{')': 'e', '+': '+TR', '$': 'e'}
+['$', 'R', 'T', '+']
+('f', '+')
+('w', '+')
+reduce
+('f', 'T')
+('w', 'id')
+{'(': 'FY', 'id': 'FY'}
+['$', 'R', 'Y', 'F']
+('f', 'F')
+('w', 'id')
+{'(': '(E)', 'id': 'id'}
+['$', 'R', 'Y', 'id']
+('f', 'id')
+('w', 'id')
+reduce
+('f', 'Y')
+('w', '*')
+{')': 'e', '+': 'e', '*': '*FY', '$': 'e'}
+['$', 'R', 'Y', 'F', '*']
 
-# Load data
-df = pd.read_csv("Bank.csv")
-train_data = df.iloc[0:93, :]
-test_data = df.iloc[94:, :]
-stop_words = set(stopwords.words('english'))
-
-# Initialize counters
-fin_class = riv_class = 0
-fin_word_freq = defaultdict(int)
-riv_word_freq = defaultdict(int)
-
-# Preprocess and count word occurrences per class
-for _, row in train_data.iterrows():
-    tokens = [word for word in word_tokenize(row['Sentence']) if word not in stop_words and word not in string.punctuation]
-    
-    if row['Class'] == 'Financial Institution':
-        fin_class += 1
-        for word in tokens:
-            fin_word_freq[word] += 1
-    elif row['Class'] == 'River Border':
-        riv_class += 1
-        for word in tokens:
-            riv_word_freq[word] += 1
-
-# Calculate prior probabilities
-tot_class = fin_class + riv_class
-prior_fin_class = math.log2(fin_class / tot_class)
-prior_riv_class = math.log2(riv_class / tot_class)
-
-# Vocabulary size
-vocab = set(list(fin_word_freq.keys()) + list(riv_word_freq.keys()))
-V = len(vocab)
-
-# Test phase
-for _, row in test_data.iterrows():
-    tokens = [word for word in word_tokenize(row['Sentence']) if word not in stop_words and word not in string.punctuation]
-
-    score_fin = prior_fin_class
-    score_riv = prior_riv_class
-    
-    for word in tokens:
-        score_fin += math.log2(fin_word_freq[word] + 1) - math.log2(fin_class + V)
-        score_riv += math.log2(riv_word_freq[word] + 1) - math.log2(riv_class + V)
-
-    print("Sense is Financial Institution" if score_fin > score_riv else "Sense is River Border")
-______________________________
-
-# Ahmed Baari 
-# OPTIMIZED VERSION 
-# WARNING: CHECK WITH VALID TESTCASES
-import nltk
-import math
-import string
-from collections import defaultdict
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-from nltk import bigrams
-
-# Input for preposition, noun, and verb
-prep = input("Enter the preposition: ").lower()
-noun = input("Enter the noun: ").lower()
-verb = input("Enter the verb: ").lower()
-
-# Stopwords and punctuation setup
-stop_words = set(stopwords.words('english'))
-
-# Using defaultdict to avoid manual key checking
-unigram_dict = defaultdict(int)
-bigram_dict = defaultdict(int)
-
-# List of sentences to analyze
-sentences = [
-    "Saw the phone with me.",
-    "Went to the meeting yesterday.",
-    "Told the man to wait.",
-    "Gave the book to her.",
-    "Saw the cat with her."
-]
-
-# Processing each sentence
-for sentence in sentences:
-    tokens = word_tokenize(sentence)
-    tokens_cleaned = [token.lower() for token in tokens if token not in string.punctuation]
-    
-    # Counting unigrams
-    for word in tokens_cleaned:
-        unigram_dict[word] += 1
-    
-    # Counting bigrams
-    for bg in bigrams(tokens_cleaned):
-        bigram_dict[bg] += 1
-
-# Default values for unseen bigrams/unigrams
-p_noun_prep = bigram_dict[(noun, prep)] / unigram_dict[noun] if unigram_dict[noun] != 0 else 0
-p_verb_prep = bigram_dict[(verb, prep)] / unigram_dict[verb] if unigram_dict[verb] != 0 else 0
-p_0_n = 1 - p_noun_prep
-
-# Ensure that the log argument is valid
-if p_noun_prep > 0 and p_verb_prep * p_0_n > 0:
-    lammbda = math.log2((p_verb_prep * p_0_n) / p_noun_prep)
-    print("Attached with Verb." if lammbda >= 0 else "Attached with Noun.")
+('f', '*')
+('w', '*')
+reduce
+('f', 'F')
+('w', 'id')
+{'(': '(E)', 'id': 'id'}
+['$', 'R', 'Y', 'id']
+('f', 'id')
+('w', 'id')
+reduce
+('f', 'Y')
+('w', '$')
+{')': 'e', '+': 'e', '*': '*FY', '$': 'e'}
+['$', 'R']
+('f', 'R')
+('w', '$')
+{')': 'e', '+': '+TR', '$': 'e'}
+['$']
+('f', '$')
+('w', '$')
+input string is valid
+-------------------------------------------------------------------
+EXP 7: LR(1) PARSER:
+CODE:
+ACTION = {0 : {'id' : 5, '(' : 4},1 : {'+' : 6, '$' : '*'}, 2 : {'+' : -2, '*' : 7, ')' : -2, '$' : -2},3 : {'+' : -4, '*' : -4, ')' : -4, '$' : -4}, 4 :
+{'id' : 5, '(' : 4},5 : {'+' : -6, '*' : -6, ')' : -6, '$' : -6},6 : {'id' : 5, '(' : 4},7 : {'id' : 5, '(' : 4},8 : {'+' : 6, ')' : 11},9 : {'+' : -1, '*' : 7,
+')' : -1, '$' : -1},10 : {'+' : -3, '*' : -3, ')' : -3, '$' : -3},11 : {'+' : -5, '*' : -5, ')' : -5, '$' : -5}}
+GOTO = {0 : {'E' : 1, 'T' : 2, 'F' : 3},4 : {'E' : 8, 'T' : 2, 'F' : 3},6 : {'T' : 9, 'F' : 3},7 : {'F' : 10}}
+GRAMMAR = [None,('E' , ['E', '+', 'T']),('E' , ['T']),('T' , ['T' , '*', 'F']),('T' , ['F']),('F' , ['(', 'E', ')']),('F' , ['id'])]
+sentence = input("Enter the statement: ").strip().split()
+stack = ['$', 0]
+i = 0
+while True:
+if i >= len(sentence) or sentence[i] not in ACTION[stack[-1]]:
+print("Failed!!")
+break
+if ACTION[stack[-1]][sentence[i]] == '*':
+print("Success!!")
+break
+elif ACTION[stack[-1]][sentence[i]] < 0:
+A, B = GRAMMAR[-ACTION[stack[-1]][sentence[i]]]
+for _ in range(2*len(B)):
+stack.pop()
+stack.append(A)
+stack.append(GOTO[stack[-2]][A])
 else:
-    print("No valid attachments.")
------------------------------------
-# A: forward procedure
-# Credit: Raghavender
-emission_probs = {'A': {'K': 0.4, 
-                        'T': 0.5}, 
-                  'B': {'K': 0.3, 
-                        'T': 0.3}
-                        }
-alpha_a = 1
-alpha_b = 0
-alpha_A = [alpha_a]
-alpha_B = [alpha_b]
+stack.append(sentence[i])
+stack.append(ACTION[stack[-2]][sentence[i]])
+i += 1
+SAMPLE INPUT AND OUTPUT:
+Enter the statement: id + id * id + ( id + id ) $
+Success!!
+Enter the statement: ( id + id ) * id $
 
-visible_states = ['K', 'T','K']  # Update with the actual visible states
+Success!!
+Enter the statement: ( ( id + id ) * ( id + id ) * id ) * ( id + id ) $
+Success!!
+Enter the statement: ( id + id ) * id * id + id + id $
+Success!!
+Fail Cases
+Enter the statement: ( id + id ) * id * id + id id $
+Failed!!
+-------------------------------------------------------------------
+EXP 8: IF TO SWITCH:
+CODE:
+(i) LEX PROG:
+%{
+#include<stdio.h>
+#include "y.tab.h"
+extern int yylval;
+%}
+%%
+[ /t] ;
+"if" return IF;
+"else" return ELSE;
+"printf" return PRINTF;
+[a-zA-Z%][a-zA-Z0-9+]* {yylval = strdup(yytext); return ID;}
+"{" return OB;
+"}" return CB;
+"(" return OP;
+")" return CP;
+[0-9]+ {yylval = atoi(yytext); return NUM;}
+"==" return EQ;
+";" return SC;
+"," return COM;
+\" {yylval = strdup(yytext);return QUOT;}
+. return yytext[0];
+%%
+(ii) YACC PROG:
+%{
+#include<stdio.h>
+int cnt=0;
+%}
+%token NUM IF ELSE ELIF PRINTF ID OB CB OP CP SC COM QUOT EQ
+%start S
+%%
+S: if elif | if else {printf("VALID PROG!");} ;
+if: IF OP ID EQ NUM CP {printf("switch(%s)\n{\ncase %d:",$3,cnt);} text;
+elif:elif elif | ELSE IF OP ID EQ NUM CP {cnt++; printf("case %d:",cnt);} text | else;
+else: ELSE {printf("default:");} def ;
+text: PRINTF OP QUOT ID QUOT COM ID CP SC {printf("printf(%s%s%s,%s);",$3,$4,$5,$7);};
+def: PRINTF OP QUOT ID QUOT CP SC {printf("printf(%s%s%s);\n}",$3,$4,$5);};
+%%
+yyerror()
+{
+printf("Error!");
+}
 
-for state in visible_states:
-    old_alpha = alpha_a
-    alpha_a = (alpha_a * 0.2 * emission_probs["A"][state]) + (alpha_b * 0.6 * emission_probs["B"][state])
-    alpha_b = (old_alpha * 0.8 * emission_probs["A"][state]) + (alpha_b * 0.4 * emission_probs["B"][state])
-    alpha_A.append(alpha_a)
-    alpha_B.append(alpha_b)
+main()
+{
+yyparse();
+}
+INPUT FILE: (inp.txt)
+if(a==0)
+printf("%d",a);
+else if(a==1)
+printf("%d",a+1);
+else if(a==2)
+printf("%d",a+2);
+else
+printf("default");
+-------------------------------------------------------------------
+EXP 9A: THREE ADDRESS CODE:
+CODE:
+(i)LEX PROG:
+%{
+#include<stdio.h>
+#include "y.tab.h"
+extern int yylval;
+%}
+%%
+[ \t\n] ;
+[0-9]+ {yylval=strdup(yytext); return NUM;}
+[_a-zA-Z][_0-9a-zA-Z]* {yylval=strdup(yytext); return ID;}
+"+" {yylval=strdup(yytext);return ADD;}
+"-" {yylval=strdup(yytext);return SUB;}
+"*" {yylval=strdup(yytext);return MUL;}
+"/" {yylval=strdup(yytext);return DIV;}
+">" {yylval=strdup(yytext);return GT;}
+"<" {yylval=strdup(yytext);return LT;}
+"=" {yylval=strdup(yytext);return EQ;}
+";" {return SC;}
+"," {return C0M;}
+"{" {return OB;}
 
-print(alpha_A)
-print(alpha_B)
+"}" {return CB;}
+"(" {return OP;}
+")" {return CP;}
+. return yytext[0];
+%%
+(ii)YACC PROG:
+%{
+#include "y.tab.h"
+#include <stdio.h>
+count=1;
+%}
+%token ID FS GT LT PL AK BS MI EQ AD OR XR MD IV QM CN SC CM OB CB OP CP IC
+%%
+S: statements {printf("\n\nvalid!!\n\n");} ;
+statements: statement statements | statement ;
+statement: ID EQ E {printf("%s = %s\n", $1, $3);};
+E: E PL T {printf("t%d = %s %s %s\n", count, $1, $2, $3); sprintf($$, "t%d", count); count++;} | value {$$ = $1;}
+| E MI T {printf("t%d = %s %s %s\n", count, $1, $2, $3); sprintf($$, "t%d", count); count++;} | value {$$ = $1;}
+| T ;
+T: T AK F {printf("t%d = %s %s %s\n", count, $1, $2, $3); sprintf($$, "t%d", count); count++;} | value {$$ = $1;}
+| T BS F {printf("t%d = %s %s %s\n", count, $1, $2, $3); sprintf($$, "t%d", count); count++;} | value {$$ = $1;}
+| F ;
+F: OP E CP {$$ = $2;} | value {$$ = $1;};
+value: IC | ID {$$ = $1;};
+operator: PL | AK | MI | BS {$$ = $1;};
+%%
+void yyerror(){
+printf("Invalid Syntax!");
+}
+int main(){
+yyparse();
+return 0;
+}
+INPUT FILE:(inp.txt)
+a=b+c*d
+OUTPUT:
+t1 = c * d
+t2 = b + t1
+a = t2
+valid!!
+-------------------------------------------------------------------
+EXP 9B: POSTFIX EXP:
+CODE:
+(i)LEX PROG:
+%{
+#include<stdio.h>
 
-# B. BACKWARD PROCEDURE
-# Credit: Ahmed Baari
-# Backward
-emission_probs = {
-    'A': {'K': 0.4, 'T': 0.5}, 
-    'B': {'K': 0.3, 'T': 0.3}
-    }
+#include "y.tab.h"
+extern int yylval;
+%}
+%%
+[0-9]+ {yylval = atoi(yytext); return NUM;}
+[a-z][a-zA-Z]* {yylval=strdup(yytext);return ID;}
+[\n\t] return 0;
+. return yytext[0];
+%%
+yywrap() {return 1;}
+(ii)YACC PROG:
+%{
+#include <stdio.h>
+#include <stdlib.h>
+%}
+%token NUM ID
+%left '+''-'
+%left '*''/'
+%%
+start:T;
+T: T'+'T {printf("+");}
+| T'-'T {printf("-"); }
+| T'*'T {printf("*"); }
+| T'/'T {printf("/");}
+| NUM {printf("%d",$1);}
+| ID {printf("%s",$1);}
+;
+%%
+int main()
+{
+printf("\nEnter expression:");
+yyparse();
+return 0;
+}
+int yyerror()
+{
+printf("Error");
+}
+INPUT:
+a+b*c
+OUTPUT:
+abc*+
+-------------------------------------------------------------------
+EXP 10: COMMON SUB EXP ELIMINATION:
+CODE:
+import java.io.*;
+import java.util.*;
+import java.lang.*;
+class mod
+{
+public static void main(String args[])throws IOException
+{
+String s,temp;
 
-b_A = 1
-b_B = 1
-beta_A = [b_A]
-beta_B = [b_B]
+Scanner sc= new Scanner(System.in);
+System.out.println("Enter the size");
+int size=sc.nextInt();
+String arr[][]=new String[size][2];
+int flag=0,index=0;
+BufferedReader br=new BufferedReader(new InputStreamReader(new FileInputStream("input.txt")));
+for(;(s=br.readLine())!=null;flag=0)
+{
+arr[index][0]=s.substring(0,s.indexOf("="));
+arr[index][1]=s.substring(s.indexOf("=")+1);
+index++;
+}
+for(int i=1;i<arr.length;i++)
+{
+for(int j=i-1;j>=0;j--)
+{
+if(arr[i][1].equals(arr[j][1]))
+{
+arr[i][1]=arr[j][0];
+break;
+}
+}
+}
+for(int i=0;i<arr.length;i++)
+{
+System.out.println(arr[i][0]+"="+arr[i][1]);
+}
+}
+}
+INPUT FILE:(input.txt)
+a=b
+b=a+e*f
+c=b
+d=a+e*f
+-------------------------------------------------------------------
+EXP 11: CODE GENERATION(machine lang):
+CODE:
+(i) LEX PROG:
+%{
+#include<stdio.h>
+#include "y.tab.h"
+extern int yylval;
+%}
+%%
 
-for state in reversed(visible_states):
-    old_bA = b_A
+[0-9]+ {yylval=strdup(yytext); return IC;}
+[_a-zA-Z][_0-9a-zA-Z]* {yylval=strdup(yytext); return ID;}
+"+" {yylval=strdup(yytext);return PL;}
+"-" {yylval=strdup(yytext);return MI;}
+"*" {yylval=strdup(yytext);return AK;}
+"/" {yylval=strdup(yytext);return BS;}
+"\\" {yylval=strdup(yytext);return FS;}
+">" {yylval=strdup(yytext);return GT;}
+"<" {yylval=strdup(yytext);return LT;}
+"=" {yylval=strdup(yytext);return EQ;}
+"&" {yylval=strdup(yytext);return AD;}
+"|" {yylval=strdup(yytext);return OR;}
+"^" {yylval=strdup(yytext);return XR;}
+"%" {yylval=strdup(yytext);return MD;}
+"~" {yylval=strdup(yytext);return IV;}
+"?" {yylval=strdup(yytext);return QM;}
+":" {yylval=strdup(yytext);return CN;}
+";" {return SC;}
+"," {return CM;}
+"{" {return OB;}
+"}" {return CB;}
+"(" {return OP;}
+")" {return CP;}
+%%
+(ii)YACC PROG:
+%{
+#include "y.tab.h"
+#include <stdio.h>
+count=1;
+%}
+%token ID FS GT LT PL AK BS MI EQ AD OR XR MD IV QM CN SC CM OB CB OP CP IC
+%%
+S: statements {printf("\n\nvalid!!\n\n");} ;
+statements: statement statements | statement ;
+statement: ID EQ E SC {printf("STR[%s], %s\n\n", $1, $3);};
+E: value operator value {
+$$=$1;
+if (!strcmp($2, "+"))
+printf("ADD %s, %s\n", $1, $3);
+else if (!strcmp($2, "-"))
+printf("SUB %s, %s\n", $1, $3);
+else if (!strcmp($2, "*"))
+printf("MUL %s, %s\n", $1, $3);
+else if (!strcmp($2, "/"))
+printf("DIV %s, %s\n", $1, $3);
+};
+value: IC {printf("LOAD R%d, %s\n", count, $1); sprintf($$, "R%d", count++);}
+| ID {printf("LOAD R%d, [%s]\n", count, $1); sprintf($$, "R%d", count++);};
+operator: PL | AK | MI | BS {$$ = $1;};
+%%
+void yyerror(){
 
-    b_A = (
-        b_A * 0.2 * emission_probs["A"][state]
-    ) + (  
-        b_B * 0.8 * emission_probs["A"][state]
-    )
+printf("Invalid Syntax!");
+}
+int main(){
+yyparse();
+return 0;
+}
+INPUT FILE (input.txt):
+a=b+c;
+c=a*d;
+-------------------------------------------------------------------
+12.LOCAL LIST SCHEDULING: (Using Python)
+from collections import defaultdict, Counter, deque
+from heapq import *
+# get delay of each instruction
+delay = {}
+print("Enter the operations and cost: ")
+while True:
+s = input()
+if not s: break
+i, c = s.split()
+delay[i] = int(c)
+# get dependency graph as input
+successors = defaultdict(list)
+predecessors = defaultdict(list)
+in_degree = Counter()
+out_degree = Counter()
+print("Enter the edges: ")
+while True:
+s = input()
+if not s: break
+u, v = s.split()
+successors[u].append(v)
+predecessors[v].append(u)
+in_degree[v] += 1
+out_degree[u] += 1
+# calculate priority
+queue = deque([i for i in predecessors if not successors[i]])
+priority = Counter()
+while queue:
+node = queue.popleft()
+priority[node] = max(priority[node], delay[node])
+for predecessor in predecessors[node]:
+priority[predecessor] = max(priority[predecessor], priority[node]+delay[predecessor])
+out_degree[predecessor] -= 1
+if not out_degree[predecessor]:
+queue.append(predecessor)
+# local list scheduling
+cycle = 1
+ready = [(-priority[op], op) for op in delay if not in_degree[op]]
+heapify(ready)
 
-    b_B = (
-        old_bA * 0.6 * emission_probs["B"][state]
-    ) + (
-        b_B * 0.4 * emission_probs["B"][state]
-    )         
-
-    beta_A.append(b_A)
-    beta_B.append(b_B)
-
-# Reverse the Beta list for correct order
-beta_A.reverse()
-beta_B.reverse()
-
-
-# C. BEST STATE SEQUENCE 
-# Credit: Ahmed Baari 
-gamma_A = []
-gamma_B = []
-
-# alpha * beta of A / that of A + that of B
-
-for i in range(3):
-    g_A = (
-        alpha_A[i] * beta_A[i]
-    ) / (
-        alpha_A[i]*beta_A[i] + alpha_B[i]*beta_B[i]
-    )
-    g_B = (
-        alpha_B[i] * beta_B[i] 
-    ) / (
-        alpha_B[i] * beta_B[i] + alpha_A[i] * beta_A[i]
-    )
-
-    gamma_A.append(g_A)
-    gamma_B.append(g_B)
-
-for i in range(3):
-    print( 
-        "A" if gamma_A[i] > gamma_B[i] else "B", 
-        end=" "
-    )
--------------------
-# Credit: Ahmed Baari
-# Exp 6: viterbi sequence
-emission_probs = {
-    "CP": {"cola": 0.6, "ice_tea": 0.1, "lem": 0.3}, 
-    "IP": {"cola": 0.1, "ice_tea": 0.7, "lem": 0.2}
-    }
-alpha_a = 1
-alpha_b = 0
-
-for _ in range(3):
-    state = input("Enter the state:")
-    alpha_a = max(alpha_a * 0.7 * emission_probs["CP"][state], 
-                           alpha_b * 0.5 * emission_probs["IP"][state])
-                           
-    alpha_b = max(alpha_a * 0.3 * emission_probs["CP"][state], 
-                           alpha_b * 0.5 * emission_probs["IP"][state])
-    print(alpha_a, alpha_b)
-    print("CP" if alpha_a > alpha_b else "IP")
-_____________________
-#pcfg
-from nltk import PCFG, InsideChartParser
-grammar = PCFG.fromstring("""
-S -> NP VP [1.0]
-NP -> NP PP [0.4] | 'he' [0.1] | 'dessert' [0.3] | 'lunch' [0.1] | 'saw' [0.1]
-PP -> Pre NP [1.0]
-VP -> Verb NP [0.3] | VP PP [0.7]
-Pre -> 'with' [0.6] | 'in' [0.4]
-Verb -> 'ate' [0.7] | 'saw' [0.3]
-""")
-parser = InsideChartParser(grammar)
-tokens = "he saw lunch with dessert".split()
-for tree in parser.parse(tokens):
-    tree.pretty_print()
-    print("PROBABILITY: ",tree.prob())
-    #tree.draw()
+active = []
+while ready or active:
+to_remove = set()
+for t,op in active:
+if t+delay[op] <= cycle:
+to_remove.add(op)
+for successor in successors[op]:
+in_degree[successor] -= 1
+if not in_degree[successor]:
+heappush(ready, (-priority[successor], successor))
+active = [(t, op) for t,op in active if op not in to_remove]
+print(f"{cycle} [{' '.join(op for p,op in ready)}] [{f' '.join(op for t,op in active)}]")
+if ready:
+p,op = heappop(ready)
+active.append((cycle, op))
+cycle += 1
+print(f"Total cycles: {cycle}")
+"""
+Enter the operations and cost:
+a 3
+b 1
+c 3
+d 2
+e 3
+f 2
+g 3
+h 2
+i 3
+Enter the edges:
+a b
+b d
+c d
+d f
+e f
+f h
+g h
+h i
+1 [a c e g] []
+2 [c g e] [a]
+3 [e g] [a c]
+4 [b g]
